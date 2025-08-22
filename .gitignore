@@ -1,0 +1,20 @@
+node_modules
+.env
+config/config.js
+config/config.json
+
+# Test coverage
+coverage/
+*.lcov
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log

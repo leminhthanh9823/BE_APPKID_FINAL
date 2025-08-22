@@ -1,0 +1,300 @@
+const repository = require("../repositories/ReadingCategory.repository.js");
+const messageManager = require("../helpers/MessageManager.helper.js");
+const { uploadToMinIO } = require("../helpers/UploadToMinIO.helper.js");
+const {
+  validateReadingCategoryFiles,
+} = require("../helpers/FileValidation.helper.js");
+
+const sanitizeReadingCategoryData = (data) => {
+  const sanitized = { ...data };
+
+  if (sanitized.grade_id !== undefined && sanitized.grade_id !== null) {
+    let gradeValue = sanitized.grade_id;
+    if (typeof gradeValue === "object" && gradeValue !== null) {
+      gradeValue =
+        gradeValue.value ||
+        gradeValue.id ||
+        gradeValue.grade_id ||
+        String(gradeValue);
+    }
+
+    sanitized.grade_id = parseInt(gradeValue);
+
+    if (isNaN(sanitized.grade_id)) {
+      delete sanitized.grade_id;
+    }
+  }
+
+  if (sanitized.is_active !== undefined) {
+    let activeValue = sanitized.is_active;
+    if (typeof activeValue === "object" && activeValue !== null) {
+      activeValue =
+        activeValue.value ||
+        activeValue.id ||
+        activeValue.is_active ||
+        String(activeValue);
+    }
+
+    if (typeof activeValue === "boolean") {
+      sanitized.is_active = activeValue ? 1 : 0;
+    } else if (typeof activeValue === "string") {
+      const lowerActive = activeValue.toLowerCase();
+      sanitized.is_active =
+        lowerActive === "true" || lowerActive === "1" ? 1 : 0;
+    } else if (typeof activeValue === "number") {
+      sanitized.is_active = activeValue ? 1 : 0;
+    } else {
+      sanitized.is_active = 1;
+    }
+  }
+
+  return sanitized;
+};
+
+const validateReadingCategoryData = (data, isUpdate = false) => {
+  if (!data.title || data.title.trim() === "") {
+    return "Title is required";
+  }
+  if (data.title.length > 255) {
+    return "Title must be less than 255 characters";
+  }
+  if (!isUpdate && !data.grade_id) {
+    return "Please select grade";
+  }
+  if (data.grade_id && (isNaN(data.grade_id) || data.grade_id < 1 || data.grade_id > 5)) {
+    return "Please select a valid grade";
+  }
+  if (data.description && data.description.length > 1000) {
+    return "Description must be less than 1000 characters";
+  }
+  return null;
+};
+
+async function getReadingCategories(req, res) {
+  try {
+    const { pageNumb = 1, pageSize = 10, searchTerm } = req.body;
+
+    const offset = (pageNumb - 1) * pageSize;
+    const limit = parseInt(pageSize);
+
+    const data = await repository.findAllWithPagination(
+      offset,
+      limit,
+      searchTerm
+    );
+    const total = await repository.countAll(searchTerm);
+    const totalPage = Math.ceil(total / pageSize);
+
+    return messageManager.fetchSuccess(
+      "readingcategory",
+      {
+        records: data,
+        total_record: total,
+        total_page: totalPage,
+      },
+      res
+    );
+  } catch (error) {
+    return messageManager.fetchFailed("readingcategory", res, error.message);
+  }
+}
+
+async function getReadingCategoryById(req, res) {
+  try {
+    const id = req.params.id;
+    const data = await repository.findById(id);
+    if (!data) {
+      return messageManager.notFound("readingcategory", res);
+    }
+
+    return messageManager.fetchSuccess("readingcategory", data, res);
+  } catch (error) {
+    return messageManager.fetchFailed("readingcategory", res, error.message);
+  }
+}
+
+async function getReadingCategoryByGrade(req, res) {
+  try {
+    const grade_id = req.params.grade_id;
+    const data = await repository.findByGrade(grade_id);
+    return messageManager.fetchSuccess("readingcategory", data, res);
+  } catch (error) {
+    return messageManager.fetchFailed("readingcategory", res, error.message);
+  }
+}
+
+async function createReadingCategory(req, res) {
+  try {
+    const sanitizedData = sanitizeReadingCategoryData(req.body);
+
+    const { title, description, grade_id } = sanitizedData;
+
+    const validationError = validateReadingCategoryData(sanitizedData);
+    if (validationError) {
+      return messageManager.validationFailed("readingcategory", res, validationError);
+    }
+
+    const fileValidationError = validateReadingCategoryFiles(req.files);
+    if (fileValidationError) {
+      return messageManager.validationFailed("readingcategory", res, fileValidationError);
+    }
+
+    let imageUrl = null;
+    if (req.files?.image) {
+      imageUrl = await uploadToMinIO(req.files.image[0], "reading_categories");
+       if (!imageUrl){
+        return messageManager.uploadFileFailed("readingcategory", res);
+      }
+    }
+    const categoryData = {
+      title,
+      description,
+      grade_id,
+      image: imageUrl,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    await repository.create(categoryData);
+
+    return messageManager.createSuccess("readingcategory", null, res);
+  } catch (error) {
+    return messageManager.createFailed("readingcategory", res, error.message);
+  }
+}
+
+async function updateReadingCategory(req, res) {
+  try {
+    const id = req.params.id;
+    const sanitizedData = sanitizeReadingCategoryData(req.body);
+
+    const { title, description, grade_id } = sanitizedData;
+
+    const category = await repository.findById(id);
+    if (!category) {
+      return messageManager.notFound("readingcategory", res);
+    }
+
+    const validationErrors = validateReadingCategoryData(sanitizedData, true);
+
+    if (validationErrors) {
+      return messageManager.validationFailed("readingcategory", res, validationErrors);
+    }
+
+    const fileValidationError = validateReadingCategoryFiles(req.files);
+    if (fileValidationError) {
+      return messageManager.validationFailed("readingcategory", res, fileValidationError);
+    }
+
+    let imageUrl = category.image;
+    if (req.files?.image) {
+
+      imageUrl = await uploadToMinIO(req.files.image[0], "reading_categories");
+      if (!imageUrl){
+        return messageManager.uploadFileFailed("readingcategory", res);
+      }
+    }
+
+    const updateData = {
+      title,
+      description,
+      grade_id,
+      image: imageUrl,
+      updated_at: new Date(),
+      is_active:
+        sanitizedData.is_active !== undefined
+          ? sanitizedData.is_active
+          : category.is_active,
+    };
+
+    await repository.update(id, updateData);
+
+    return messageManager.updateSuccess("readingcategory", null, res);
+  } catch (error) {
+    return messageManager.updateFailed("readingcategory", res, error.message);
+  }
+}
+
+async function deleteReadingCategory(req, res) {
+  try {
+    const id = req.params.id;
+    const deleted = await repository.delete(id);
+
+    if (!deleted) {
+      return messageManager.notFound("readingcategory", res);
+    }
+
+    return messageManager.deleteSuccess("readingcategory", res);
+  } catch (error) {
+    return messageManager.deleteFailed("readingcategory", res, error.message);
+  }
+}
+
+async function getReadingCategoriesWithStats(req, res) {
+  try {
+    const { pageNumb = 1, pageSize = 10, searchTerm = "", grade_id } = req.body;
+
+    const offset = (pageNumb - 1) * pageSize;
+    const limit = parseInt(pageSize);
+
+    const data = await repository.findAllWithStatsAndPagination(
+      offset,
+      limit,
+      searchTerm,
+      grade_id
+    );
+    const total = await repository.countAllWithStats(searchTerm, grade_id);
+    const totalPage = Math.ceil(total / pageSize);
+
+    return messageManager.fetchSuccess(
+      "readingcategory",
+      {
+        records: data,
+        total_record: total,
+        total_page: totalPage,
+      },
+      res
+    );
+  } catch (error) {
+    console.error("Error getting reading categories with stats:", error);
+    return messageManager.fetchFailed("readingcategory", res, error.message);
+  }
+}
+
+async function toggleStatus(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return messageManager.notFound("readingcategory", res);
+    }
+
+    const category = await repository.findById(id);
+    if (!category) {
+      return messageManager.notFound("readingcategory", res);
+    }
+
+    const newStatus = category.is_active === 1 ? 0 : 1;
+    await repository.update(id, { is_active: newStatus });
+
+    return messageManager.updateSuccess(
+      "readingcategory",
+      category,
+      res
+    );
+  } catch (error) {
+    console.error("Error toggling reading category status:", error);
+    return messageManager.updateFailed("readingcategory", res, error.message);
+  }
+}
+
+module.exports = {
+  getReadingCategories,
+  getReadingCategoryById,
+  getReadingCategoryByGrade,
+  createReadingCategory,
+  updateReadingCategory,
+  deleteReadingCategory,
+  toggleStatus,
+  getReadingCategoriesWithStats,
+};
