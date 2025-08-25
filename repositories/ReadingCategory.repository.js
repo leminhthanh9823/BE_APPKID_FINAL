@@ -11,7 +11,7 @@ class ReadingCategoryRepository {
 
   async findByGrade(grade_id) {
     return ReadingCategory.findAll({
-      where: { grade_id },
+      where: { grade_id, is_active: 1 },
     });
   }
 

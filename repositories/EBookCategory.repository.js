@@ -2,7 +2,9 @@ const { EBookCategory, EBook, EBookCategoryRelations } = require("../models");
 const { where,Op,ne,fn,col, Sequelize } = require("sequelize");
 class EBookCategoryRepository {
   async findAll() {
-    return EBookCategory.findAll();
+    return EBookCategory.findAll({
+      where: { is_active: 1 },
+    });
   }
 
   async findById(id) {

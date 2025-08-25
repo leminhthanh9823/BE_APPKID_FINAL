@@ -576,7 +576,7 @@ async function getListReading(req, res) {
     const records = await repository.getAllActiveReadings(
       searchTerm
     );
-    return MessageManager.fetchSuccess("kidreading", {
+    return messageManager.fetchSuccess("kidreading", {
       records: records.map((record) => ({
         id: record.id,
         title: record.title,
@@ -586,7 +586,7 @@ async function getListReading(req, res) {
     }, res);
 
   }catch (error) {
-    return MessageManager.fetchFailed("kidreading", res);
+    return messageManager.fetchFailed("kidreading", res);
   }
 }
 
