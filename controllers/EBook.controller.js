@@ -73,9 +73,8 @@ const validateEBookData = (data, isUpdate = false) => {
   if (data.description && data.description.length > 1000) {
     return "Description is less than 1000 characters";
   }
-
-  if (data.reference && data.reference.length > 1000) {
-    return "Reference is less than 1000 characters";
+  if (data.reference && data.reference.length > 254) {
+    return "Reference is less than 254 characters";
   }
 
   if (
@@ -94,8 +93,6 @@ const validateEBookData = (data, isUpdate = false) => {
   if (invalidCategories.length > 0) {
     return "Please select valid categories";
   }
-
-
 
   if (data.is_active === undefined || data.is_active === null) {
     return "Please select status";
@@ -447,6 +444,7 @@ async function create(req, res) {
       return messageManager.validationFailed("ebook", res, "Video file is required");
     }
 
+
     const fileValidationError = validateEBookFiles(req.files);
     if (fileValidationError) {
       return messageManager.validationFailed("ebook", res, fileValidationError);
@@ -472,6 +470,12 @@ async function create(req, res) {
        return messageManager.uploadFileFailed("ebook", res);
     }
 
+    const backgroundUrl = await uploadToMinIO(req.files.background[0], "ebook");
+
+    if (!backgroundUrl) {
+      return messageManager.uploadFileFailed("ebook", res);
+    }
+
     let transaction;
     try {
       const sequelize = db.sequelize;
@@ -482,6 +486,7 @@ async function create(req, res) {
           ...ebookData,
           image: imageUrl,
           file: fileUrl,
+          background: backgroundUrl,
           is_active: ebookData.is_active === 1 ? 1 : 0,
         },
         { transaction }
@@ -503,6 +508,7 @@ async function create(req, res) {
       throw error;
     }
   } catch (error) {
+    
     return messageManager.createFailed("ebook", res, error.message);
   }
 }

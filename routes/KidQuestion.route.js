@@ -21,7 +21,9 @@ router.get(
   jwtMiddleware,
   controller.getQuestionAndOptionsById
 );
-router.post("/cms/create-question-options", jwtMiddleware, controller.create);
+router.post("/cms/create-question-options", jwtMiddleware, controller.createQuestionAndOptions);
+router.put('/cms/update-question-options', jwtMiddleware, controller.updateQuestionAndOptions);
+
 router.put("/edit/:id", jwtMiddleware, adminOrTeacher, controller.update);
 router.delete("/delete/:id", jwtMiddleware, adminOrTeacher, controller.remove);
 router.put("/:id/update-status", jwtMiddleware, adminOrTeacher, controller.toggleStatus);

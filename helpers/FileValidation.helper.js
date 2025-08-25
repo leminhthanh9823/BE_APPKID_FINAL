@@ -65,10 +65,10 @@ const validateEBookFiles = (files) => {
     const fileTypeError = validateFileType(
       files.file[0],
       ["video"],
-      "Video file"
+      "Learning resource"
     );
     if (fileTypeError) return fileTypeError;
-    const fileSizeError = validateFileSize(files.file[0], 100, "Video file");
+    const fileSizeError = validateFileSize(files.file[0], 100, "Learning resource");
     if (fileSizeError) return fileSizeError;
   }
 
