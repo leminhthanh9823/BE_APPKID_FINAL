@@ -746,6 +746,31 @@ class AuthController {
         .json({ success: false, message: "update user failed" });
     }
   }
+
+  async resetPasswordByAdmin(req, res) {
+    const { id, newPassword } = req.body;
+    try {
+      const user = await db.User.findOne({ where: { id } });
+      if (!user) {
+        return messageManager.notFound("user", res);
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await db.User.update(
+        { password: hashedPassword },
+        { where: { id } }
+      );
+      return res.json({
+        success: true,
+        message: "Password reset successfully",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Password reset failed",
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new AuthController();
