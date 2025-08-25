@@ -646,7 +646,7 @@ class AuthController {
   }
 
   async resetPassword(req, res) {
-    const { newPassword } = req.body;
+    const { id, newPassword } = req.body;
     const token = req.headers.authorization?.split(" ")[1];
     if (!token)
       return res

@@ -48,7 +48,10 @@ class ReadingCategoryRepository {
   async findAllWithPagination(offset, limit, searchTerm) {
     const whereClause = {};
     if (searchTerm) {
-      whereClause.title = { [Op.like]: `%${searchTerm}%` };
+      whereClause[Op.or] = [
+        { title: { [Op.like]: `%${searchTerm}%` } },
+        { description: { [Op.like]: `%${searchTerm}%` } }
+      ];
     }
     return ReadingCategory.findAll({
       where: whereClause,
@@ -61,7 +64,10 @@ class ReadingCategoryRepository {
   async countAll(searchTerm) {
     const whereClause = {};
     if (searchTerm) {
-      whereClause.title = { [Op.like]: `%${searchTerm}%` };
+      whereClause[Op.or] = [
+        { title: { [Op.like]: `%${searchTerm}%` } },
+        { description: { [Op.like]: `%${searchTerm}%` } }
+      ];
     }
     return ReadingCategory.count({ where: whereClause });
   }

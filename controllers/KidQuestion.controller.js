@@ -2,6 +2,10 @@ const db = require("../models");
 const messageManager = require("../helpers/MessageManager.helper.js");
 const KidStudentDetailsRepository = require("../repositories/KidStudentDetails.repository.js");
 const KidQuestionRepository = require("../repositories/KidQuestion.repository");
+const KidReadingRepository = require("../repositories/KidReading.repository.js");
+const OptionRepository = require("../repositories/Option.repository.js");
+const KidQuestion = db.Question;
+const Option = db.Option;
 
 const validateQuestionData = (data) => {
   if (!data.question || data.question.trim() === "") {
@@ -174,20 +178,64 @@ async function getById(req, res) {
   }
 }
 
-async function create(req, res) {
+async function createQuestionAndOptions(req, res) {
   try {
+    const {
+      question_level_id,
+      kid_reading_id,
+      grade_id,
+      question_category_id,
+      question,
+      question_type,
+      number_of_ans,
+      number_of_qus,
+      connection,
+      options,
+    } = req.body;
+
     const validationError = validateQuestionData(req.body);
+
     if (validationError) {
       return messageManager.validationFailed("question", res, validationError);
     }
-    const readingExists = await db.KidReading.findByPk(req.body.kid_reading_id);
-    if (!readingExists) {
-      return messageManager.notFound("reading", res);
+
+    const sequelize = db.sequelize;
+    const transaction = await sequelize.transaction();
+    try {
+      const newQuestion = await KidQuestion.create(
+        {
+          question_level_id,
+          kid_reading_id,
+          grade_id,
+          question_category_id,
+          question,
+          question_type,
+          number_of_options: options.length,
+          number_of_ans,
+          number_of_qus,
+          connection,
+        },
+        { transaction }
+      );
+     
+      const optionData = options.map((opt) => ({
+        kid_question_id: newQuestion.id,
+        option: opt.option,
+        isCorrect: opt.isCorrect || 0,
+        type: opt.type || 0,
+        key_position: opt.key_position || 0,
+      }));
+      await Option.bulkCreate(optionData, { transaction });
+
+      await transaction.commit();
+
+      return messageManager.createSuccess("question", newQuestion, res);
+    } catch (err) {
+      await transaction.rollback();
+      throw new Error(err.message);
     }
-    const created = await db.Question.create(req.body);
-  return messageManager.createSuccess("question", created, res);
-  } catch (error) {
-  return messageManager.createFailed("question", res);
+  } catch (err) {
+    return messageManager.createFailed("question", res);
   }
 }
 
@@ -328,18 +376,118 @@ async function getByReadingIdCMS(req, res) {
 async function checkIsPracticed(req, res) {
   try {
     const { id } = req.body || {};
-    let isPracticed = await KidStudentDetailsRepository.checkIsExisted(id);
-  return messageManager.fetchSuccess("question", { isPracticed }, res);
+    let isPracticed = await KidReadingRepository.checkIsPracticed(id);
+    return messageManager.fetchSuccess("question", { isPracticed }, res);
   } catch (error) {
   return messageManager.fetchFailed("question", res, error.message);
   }
 }
+
+//cms
+async function updateQuestionAndOptions(req, res) {
+  try {
+    const {
+      id,
+      kid_reading_id,
+    } = req.body;
+
+    let isPracticed = await KidReadingRepository.checkIsPracticed(kid_reading_id);
+    if (isPracticed) {
+      let {
+        question_level_id,
+        is_active
+      } = req.body;
+      await KidQuestionRepository.updateQuestionInfo(
+        id,
+        {
+          question_level_id,
+          is_active,
+        }
+      );
+    } else {
+      let {
+        question_level_id,
+        grade_id,
+        question,
+        question_type,
+        number_of_ans,
+        number_of_qus,
+        is_active,
+        connection,
+        options,
+      } = req.body;
+      const sequelize = db.sequelize;
+      const transaction = await sequelize.transaction();
+      try {
+        await KidQuestionRepository.updateQuestionInfo(
+          id,
+          {
+            question_level_id,
+            grade_id,
+            question,
+            question_type,
+            number_of_options: options.length,
+            number_of_ans,
+            number_of_qus,
+            is_active,
+            connection,
+          },
+          transaction
+        );
+
+        // // Lấy danh sách id của options mới từ request
+        let newOptionIds = options.filter((opt) => opt.id).map((opt) => opt.id);
+
+        // Xóa các options không có trong danh sách mới
+        await OptionRepository.deleteOptionsNotInIds(
+          id,
+          newOptionIds,
+          transaction
+        );
+
+        // Cập nhật các options đã tồn tại
+        const updateOptionPromises = options
+          .filter((opt) => opt.id)
+          .map((opt) =>
+            OptionRepository.updateById(
+              opt.id,
+              {
+                option: opt.option,
+                isCorrect: opt.isCorrect || 0,
+                key_position: opt.key_position || 0,
+                is_active: opt.is_active || 0,
+              },
+              transaction
+            )
+          );
+        await Promise.all(updateOptionPromises);
+
+        // // Thêm mới các options
+        let newOptions = options.filter((opt) => !opt.id);
+        await OptionRepository.bulkCreateOptions(newOptions, id, transaction);
+
+        await transaction.commit();
+
+      } catch (err) {
+        await transaction.rollback();
+        throw err;
+      }
+    }
+    return messageManager.updateSuccess("question", req.body, res);
+
+  } catch (error) {
+    console.log(error)
+    return messageManager.updateFailed("question", res);
+  }
+};
+
 module.exports = {
   getAll,
   getById,
   getByReadingId,
   getQuestionsByReadingId,
-  create,
+  createQuestionAndOptions,
+  updateQuestionAndOptions,
   update,
   remove,
   toggleStatus,

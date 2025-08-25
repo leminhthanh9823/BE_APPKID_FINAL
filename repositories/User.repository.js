@@ -42,9 +42,11 @@ class UserRepository {
       { where: { id: userId } }
     );
   }
-  async findAllPaging(offset, limit, searchTerm, role_id) {
+  async findAllPaging(offset, limit, searchTerm, role_id, userId) {
     let whereClause = {};
-
+    
+    whereClause.id = { [Op.ne]: userId };
+    
     if (role_id) {
       whereClause.role_id = role_id;
     }

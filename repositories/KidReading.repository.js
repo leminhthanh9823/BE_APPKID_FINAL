@@ -387,6 +387,36 @@ class KidReadingRepository {
       };
     });
   }
+
+  async findGradesByCategoryIds(categoryIds) {
+    return this.withRetry(async () => {
+      const categories = await ReadingCategory.findAll({
+        where: {
+          id: { [Op.in]: categoryIds },
+        },
+        attributes: ['grade_id'],
+        group: ['grade_id'],
+        raw: true
+      });
+
+      const uniqueGrades = [...new Set(categories.map(cat => cat.grade_id))]
+        .filter(gradeId => gradeId !== null && gradeId !== undefined)
+        .sort((a, b) => a - b);
+
+      return uniqueGrades;
+    });
+  }
+
+  async checkIsPracticed(readingId) {
+    return this.withRetry(async () => {
+      const reading = await KidReading.findOne({
+        where: { id: readingId },
+        attributes: ['id']
+      });
+
+      return reading !== null;
+    });
+  }
 }
 
 module.exports = new KidReadingRepository();

@@ -6,6 +6,7 @@ const {
 } = require("../helpers/FileValidation.helper.js");
 const db = require("../models");
 const NotifyTargetRepository = require("../repositories/NotifyTarget.repository.js");
+const KidReadingRepository = require("../repositories/KidReading.repository.js");
 
 const formatDateToYYYYMMDD = (date) => {
   if (!date) return null;
@@ -96,8 +97,8 @@ const validateKidReadingData = (data, isUpdate = false) => {
   if (data.description && data.description.length > 1000) {
     return "Description is less than 1000 characters";
   }
-  if (data.reference && data.reference.length > 1000) {
-    return "Reference cannot exceed 1000 characters";
+  if (data.reference && data.reference.length > 254) {
+    return "Reference cannot exceed 254 characters";
   }
   return null;
 };
@@ -331,7 +332,8 @@ async function createKidReading(req, res) {
       await db.ReadingCategoryRelations.bulkCreate(categoryRelations, {
         transaction,
       });
-      if (is_send_notify) {
+      if (is_send_notify == true) {
+        let grade_id = await KidReadingRepository.findGradesByCategoryIds(categoryIdsToProcess)
         let sendDate = new Date(Date.now() + 60 * 1000);
         let newNotification = await db.Notify.create(
           {
@@ -351,13 +353,14 @@ async function createKidReading(req, res) {
         });
       }
       await transaction.commit();
-  return messageManager.createSuccess("kidreading", created, res);
+      return messageManager.createSuccess("kidreading", created, res);
     } catch (error) {
       if (transaction) await transaction.rollback();
       throw error;
     }
   } catch (error) {
-  return messageManager.createFailed("kidreading", res);
+    console.log(error)
+    return messageManager.createFailed("kidreading", res);
   }
 }
 

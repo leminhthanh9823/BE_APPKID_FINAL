@@ -53,14 +53,16 @@ const validateUserData = (data, isUpdate = false) => {
   ) {
     return "Invalid phone number";
   }
-  if (
-    data.role_id &&
-    data.role_id !== 1 &&
-    data.role_id !== 2 &&
-    data.role_id !== 3 &&
-    data.role_id !== 4
-  ) {
-    return "Please select user role";
+  if ( !isUpdate ) {
+    try{
+      let roleIdNumber = parseInt(data.role_id);
+      if(data.role_id && [1, 2, 3, 4].indexOf(roleIdNumber) === -1) {
+        throw new Error("Please select role");
+      }
+    }
+    catch(e){
+      return "Please select role";
+    }
   }
   return null;
 };
@@ -154,12 +156,14 @@ async function getAll(req, res) {
       searchTerm = "",
       role_id = null,
     } = req.body || {};
+    let { id: userId } = req.user || {};
     const offset = (pageNumb - 1) * pageSize;
     const { rows, count } = await repository.findAllPaging(
       offset,
       pageSize,
       searchTerm,
-      role_id
+      role_id,
+      userId
     );
     const transformedRows = rows.map((user) => {
       const userObject = user.toJSON ? user.toJSON() : { ...user };
@@ -295,9 +299,17 @@ async function remove(req, res) {
 async function toggleStatus(req, res) {
   try {
     const { id } = req.params;
+
+     let { id: userId } = req.user || {};
+
     if (!id || isNaN(id)) {
       return messageManager.notFound("user", res);
     }
+
+    if(id == userId){
+      return messageManager.validationFailed("user", res, "Cannot change your own status");
+    }
+
     const user = await db.User.findByPk(id);
     if (!user) {
       return messageManager.notFound("user", res);

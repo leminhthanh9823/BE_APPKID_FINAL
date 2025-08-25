@@ -50,7 +50,7 @@ exports.getAll = async (req, res) => {
           q.notify_target.length > 0 &&
           q.notify_target.some((t) => t.grade_id)
         ) {
-          target_type = "All classes";
+          target_type = "Grades";
         } else if (
           q.notify_target.length > 0 &&
           q.notify_target.some((t) => t.student_id)

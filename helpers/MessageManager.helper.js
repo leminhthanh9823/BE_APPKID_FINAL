@@ -119,7 +119,7 @@ class MessageManager {
       500,
       error = error
     );
-    console.error(`[MessageManager] createFailed for ${entity}:`, error);
+    console.error(`[MessageManager] create failed for ${entity}:`, error);
     return res ? res.status(500).json(response) : response;
   }
 
