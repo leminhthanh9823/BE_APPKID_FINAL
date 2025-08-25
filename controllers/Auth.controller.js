@@ -13,6 +13,29 @@ const ACCESS_TOKEN_EXPIRATION = process.env.ACCESS_TOKEN_EXPIRATION;
 const REFRESH_TOKEN_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || "7d";
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
+const validateUser = (data) => {
+  if (!data.username || data.username.trim() === "") {
+    return "Username is required";
+  } else if (data.username.length < 3) {
+    return "Username must be at least 3 characters";
+  } else if (data.username.length > 50) {
+    return "Username cannot exceed 50 characters";
+  } else if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
+    return "Username can only contain letters, numbers and underscores";
+  }
+
+  if (!data.password || data.password.trim() === "") {
+    return "Password is required";
+  } else if (data.password.length < 6) {
+    return "Password must be at least 6 characters";
+  } else if (data.password.length > 100) {
+    return "Password cannot exceed 100 characters";
+  }
+
+  return null;
+}
+
+
 class AuthController {
   constructor() {
     this.register = this.register.bind(this);
@@ -134,21 +157,21 @@ class AuthController {
    */
   async login(req, res) {
     const { username, password } = req.body;
+    const validationError = validateUser({username, password })
 
-    if (!username || !password) {
-      return messageManager.validationFailed("user", res, "validate user failed");
+    if (validationError) {
+      return messageManager.validationFailed("user", res, validationError);
     }
 
     try {
-      console.log(username)
       const user = await userRepository.findByUsername(username);
       if (!user) {
-        return messageManager.notFound("user", res);
+        return messageManager.validationFailed("user", res, "User not found, please try again");
       }
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
-        return messageManager.validationFailed("user", res, "validate user failed");
+        return messageManager.validationFailed("user", res, "Password is incorrect");
       }
 
       const accessToken = jwt.sign(
