@@ -82,6 +82,7 @@ async function getQuestionsByReadingId(readingId) {
         type: q.question_type,
         type_code: typeCode,
         question: q.question,
+        level: q.question_level_id.toString(),
         options: q.options.map((opt) => ({
           option_id: opt.id,
           option: opt.option,

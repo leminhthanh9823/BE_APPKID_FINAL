@@ -103,50 +103,55 @@ class KidReadingRepository {
     return { rows: resultRows, total };
   }
 
+
   async findByCategoryAndStudentId(categoryId, studentId) {
-    const category_reading = await ReadingCategory.findByPk(categoryId, {
+    const readings = await KidReading.findAll({
+      where: {
+        is_active: 1,
+      },
       include: [
         {
-          model: KidReading,
-          as: "kid_readings",
+          model: ReadingCategory,
+          as: "categories",
+          attributes: ["id", "title", "description", "grade_id", "image"],
           through: { attributes: [] },
-          where: { is_active: 1 },
-          include: [
-            {
-              model: StudentReading,
-              as: "student_readings",
-              attributes: ["is_completed", "is_passed", "score"],
-              where: {
-                kid_student_id: studentId,
-                is_active: 1
-              },
-              required: false,
-            },
-            {
-              model: Question,
-              as: "questions",
-              attributes: ["id"],
-            },
-            {
-              model: db.ReadingCategory,
-              as: "categories",
-              attributes: ["id", "title", "description", "grade_id", "image"],
-              through: { attributes: [] },
-            },
-          ],
+          where: {
+            id: categoryId,
+          },
+          required: true,
+        },
+        {
+          model: StudentReading,
+          as: "student_readings",
+          attributes: ["is_completed", "is_passed", "score"],
+          where: {
+            kid_student_id: studentId,
+          },
+          required: false,
+        },
+        {
+          model: Question,
+          as: "questions",
+          attributes: ["id"],
         },
       ],
+      order: [['created_at', 'DESC']], 
     });
 
-    if (!category_reading) return [];
+    if (!readings || readings.length === 0) {
+      return [];
+    }
+    const result = readings.map((reading) => {
+      const bestStudentReading =
+        reading.student_readings?.length > 0
+          ? reading.student_readings.reduce((max, current) => {
+              return (current.score ?? 0) > (max.score ?? 0) ? current : max;
+            })
+          : null;
 
-    const result = category_reading.kid_readings.map((reading) => {
-      const bestStudentReading = reading.student_readings?.reduce(
-        (max, current) => {
-          return (current.score ?? 0) > (max.score ?? 0) ? current : max;
-        },
-        reading.student_readings?.[0] ?? null
-      );
+      const totalQuestions = reading.questions?.length ?? 0;
+      const bestScore = bestStudentReading?.score ?? 0;
+
       return {
         id: reading.id,
         title: reading.title,
@@ -159,16 +164,11 @@ class KidReadingRepository {
         is_completed: bestStudentReading?.is_completed ?? 0,
         is_passed: bestStudentReading?.is_passed ?? 0,
         score: bestStudentReading?.score ?? null,
-        total_quiz: reading.questions?.length ?? 0,
-        stars:
-          (reading.questions?.length ?? 0) > 5
-            ? 5
-            : reading.questions?.length ?? 0,
-        total_complete_quiz: bestStudentReading?.score ?? 0,
+        total_quiz: totalQuestions,
+        stars: totalQuestions > 5 ? 5 : totalQuestions,
+        total_complete_quiz: bestScore,
         max_achieved_stars:
-          ((bestStudentReading?.score ?? 0) /
-            (reading.questions?.length ?? 1)) *
-          5,
+          totalQuestions > 0 ? (bestScore / totalQuestions) * 5 : 0,
         categories: reading.categories || [],
         category: reading.categories?.[0] || null,
       };

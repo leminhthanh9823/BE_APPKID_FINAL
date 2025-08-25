@@ -144,7 +144,7 @@ db.ReadingCategoryRelations.belongsTo(db.KidReading, {
 });
 db.ReadingCategoryRelations.belongsTo(db.ReadingCategory, {
   foreignKey: "category_id",
-  as: "category",
+  as: "categories",
 });
 
 // EBook <-> EBookCategory (many-to-many)

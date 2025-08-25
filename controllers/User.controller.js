@@ -2,6 +2,7 @@ const repository = require("../repositories/User.repository");
 const bcrypt = require("bcryptjs");
 const db = require("../models");
 const messageManager = require("../helpers/MessageManager.helper.js");
+const { uploadToMinIO } = require("../helpers/UploadToMinIO.helper.js");
 
 const formatDateToYYYYMMDD = (date) => {
   if (!date) return null;
@@ -263,7 +264,12 @@ async function update(req, res) {
     if (sanitizedData.password) {
       updateData.password = await bcrypt.hash(sanitizedData.password, 10);
     }
-    await db.User.update(updateData, { where: { id } });
+    let imageUrl = exists.image;
+
+    if (req.file) {
+      imageUrl = await uploadToMinIO(req.file, "users");
+    }
+    await db.User.update({ ...updateData, image: imageUrl }, { where: { id } });
   return messageManager.updateSuccess("user", null, res);
   } catch (error) {
   return messageManager.updateFailed("user", res, error.message);
