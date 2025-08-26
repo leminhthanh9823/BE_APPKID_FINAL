@@ -166,6 +166,22 @@ exports.updateById = async (req, res) => {
       return messageManager.notFound("notification", res);
     }
 
+    let targetNotifications = await db.NotifyTarget.findAll({
+        where: { notify_id: id },
+      });
+
+    let type_target = 0;
+    if (targetNotifications[0] && targetNotifications[0].grade_id) {
+      type_target = 1;
+    } else if (targetNotifications[0] && targetNotifications[0].student_id) {
+      type_target = 2;
+    }
+    const validationError = validateNotificationData({ title, content, is_active, type_target, grades, students });
+
+    if (validationError) {
+      return messageManager.validationFailed("notification", res, validationError);
+    }
+
     const sequelize = db.sequelize;
     const transaction = await sequelize.transaction();
     try {
@@ -180,17 +196,6 @@ exports.updateById = async (req, res) => {
           transaction,
         }
       );
-
-      let targetNotifications = await db.NotifyTarget.findAll({
-        where: { notify_id: id },
-      });
-
-      let type_target = 0;
-      if (targetNotifications[0] && targetNotifications[0].grade_id) {
-        type_target = 1;
-      } else if (targetNotifications[0] && targetNotifications[0].student_id) {
-        type_target = 2;
-      }
 
       if (type_target === 1 && targetNotifications.length > 0) {
         const existingGradeIds = targetNotifications
