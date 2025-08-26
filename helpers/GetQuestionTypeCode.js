@@ -18,6 +18,8 @@ function getQuestionTypeInfo(questionType) {
       return { typeCode: 'T' };
     case 'Crossword Puzzle':
       return { typeCode: 'CWP' };
+    case 'Reading':
+      return { typeCode: 'read' };
     default:
       return { typeCode: '' };
   }

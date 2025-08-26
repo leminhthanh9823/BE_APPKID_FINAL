@@ -165,7 +165,7 @@ class KidReadingRepository {
         is_passed: bestStudentReading?.is_passed ?? 0,
         score: bestStudentReading?.score ?? null,
         total_quiz: totalQuestions,
-        stars: totalQuestions > 5 ? 5 : totalQuestions,
+        stars: 5,
         total_complete_quiz: bestScore,
         max_achieved_stars:
           totalQuestions > 0 ? (bestScore / totalQuestions) * 5 : 0,
