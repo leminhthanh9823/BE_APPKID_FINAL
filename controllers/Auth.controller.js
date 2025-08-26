@@ -176,7 +176,7 @@ class AuthController {
       }
 
       if(user.status == 0){
-        return messageManager.validationFailed("user", res, "User is not locked");
+        return messageManager.validationFailed("user", res, "Your account is locked.");
       }
 
       const accessToken = jwt.sign(
