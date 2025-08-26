@@ -175,6 +175,10 @@ class AuthController {
         return messageManager.validationFailed("user", res, "Password is incorrect");
       }
 
+      if(user.status == 0){
+        return messageManager.validationFailed("user", res, "User is not locked");
+      }
+
       const accessToken = jwt.sign(
         { id: user.id, email: user.email, role_id: user.role_id },
         ACCESS_TOKEN_SECRET_KEY,
