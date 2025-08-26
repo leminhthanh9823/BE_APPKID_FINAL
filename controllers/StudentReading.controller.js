@@ -289,7 +289,7 @@ const getStudentStatistics = async (req, res) => {
         break;
     }
 
-    const studentReadings = await db.StudentReading.findAll({
+    const studentReadingsRaw = await db.StudentReading.findAll({
       where: {
         kid_student_id: student_id,
         [Op.or]: [
@@ -314,6 +314,7 @@ const getStudentStatistics = async (req, res) => {
       ],
       attributes: [
         "id",
+        "kid_reading_id",
         "duration",
         "created_at",
         "is_completed",
@@ -324,6 +325,16 @@ const getStudentStatistics = async (req, res) => {
       ],
       order: [["created_at", "ASC"]],
     });
+
+    // Lọc chỉ lấy mỗi cặp kid_student_id và kid_reading_id một lần duy nhất
+    const uniqueReadingsMap = new Map();
+    studentReadingsRaw.forEach(reading => {
+      const key = `${reading.kid_student_id}_${reading.kid_reading_id}`;
+      if (!uniqueReadingsMap.has(key)) {
+        uniqueReadingsMap.set(key, reading);
+      }
+    });
+    const studentReadings = Array.from(uniqueReadingsMap.values());
 
     let totalLessons = studentReadings.length;
     let completedLessons = studentReadings.filter(
