@@ -8,14 +8,20 @@ const messageManager = require("../helpers/MessageManager.helper.js");
 const parseDurationToMinutes = (durationStr) => {
   if (!durationStr) return 15;
 
-  const timeMatch = durationStr.match(/(\d+):(\d+)/);
+  // Nếu có dạng phút:giây
+  const timeMatch = durationStr.match(/^(\d+):(\d+)$/);
   if (timeMatch) {
     const minutes = parseInt(timeMatch[1]);
     const seconds = parseInt(timeMatch[2]);
-    return minutes + Math.round(seconds / 60);
+    return minutes + seconds / 60;
   }
 
-  return parseInt(durationStr) || 15;
+  // Nếu chỉ là số, coi là giây, chuyển sang phút
+  if (/^\d+$/.test(durationStr)) {
+    return parseInt(durationStr) / 60;
+  }
+
+  return 15;
 };
 
 const getWeekNumber = (date) => {
@@ -326,43 +332,31 @@ const getStudentStatistics = async (req, res) => {
       order: [["created_at", "ASC"]],
     });
 
-    // Lọc chỉ lấy mỗi cặp kid_student_id và kid_reading_id một lần duy nhất
-    const uniqueReadingsMap = new Map();
-    studentReadingsRaw.forEach(reading => {
-      const key = `${reading.kid_student_id}_${reading.kid_reading_id}`;
-      if (!uniqueReadingsMap.has(key)) {
-        uniqueReadingsMap.set(key, reading);
-      }
-    });
-    const studentReadings = Array.from(uniqueReadingsMap.values());
-
-    let totalLessons = studentReadings.length;
-    let completedLessons = studentReadings.filter(
-      (r) => r.is_completed === 1
-    ).length;
-    let passedLessons = studentReadings.filter((r) => r.is_passed === 1).length;
+    // Số bài học là số lượng kid_reading_id duy nhất
+    const uniqueLessonIds = new Set(studentReadingsRaw.map(r => r.kid_reading_id));
+    let totalLessons = uniqueLessonIds.size;
+    let completedLessons = studentReadingsRaw.filter((r) => r.is_completed === 1).length;
+    let passedLessons = studentReadingsRaw.filter((r) => r.is_passed === 1).length;
     let totalMinutes = 0;
-
-    studentReadings.forEach((reading) => {
+    studentReadingsRaw.forEach((reading) => {
       const durationInMinutes = parseDurationToMinutes(reading.duration);
       totalMinutes += durationInMinutes;
     });
 
-    const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+    const totalMinutesRounded = Math.round(totalMinutes * 100) / 100;
+    const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
     const averageScore =
       totalLessons > 0
         ? Math.round(
-            studentReadings.reduce((sum, r) => sum + (r.score || 0), 0) /
-              totalLessons
-          )
+            (studentReadingsRaw.reduce((sum, r) => sum + (r.score || 0), 0) /
+              studentReadingsRaw.length) * 100
+          ) / 100
         : 0;
 
     let chartData = [];
-
     if (type === "week") {
       chartData = new Array(7).fill(0);
-
-      studentReadings.forEach((reading) => {
+      studentReadingsRaw.forEach((reading) => {
         const readingDate = new Date(
           reading.date_reading || reading.created_at
         );
@@ -373,8 +367,7 @@ const getStudentStatistics = async (req, res) => {
     } else if (type === "month") {
       const daysInMonth = labels.length;
       chartData = new Array(daysInMonth).fill(0);
-
-      studentReadings.forEach((reading) => {
+      studentReadingsRaw.forEach((reading) => {
         const readingDate = new Date(
           reading.date_reading || reading.created_at
         );
@@ -384,8 +377,7 @@ const getStudentStatistics = async (req, res) => {
       });
     } else if (type === "year") {
       chartData = new Array(12).fill(0);
-
-      studentReadings.forEach((reading) => {
+      studentReadingsRaw.forEach((reading) => {
         const readingDate = new Date(
           reading.date_reading || reading.created_at
         );
@@ -401,7 +393,7 @@ const getStudentStatistics = async (req, res) => {
         totalLessons,
         completedLessons,
         passedLessons,
-        totalMinutes,
+        totalMinutes: totalMinutesRounded,
         totalHours,
         averageScore,
         period: periodInfo,
@@ -409,7 +401,7 @@ const getStudentStatistics = async (req, res) => {
           totalLessons,
           completedLessons,
           passedLessons,
-          totalMinutes,
+          totalMinutes: totalMinutesRounded,
           totalHours,
           averageScore,
         },
