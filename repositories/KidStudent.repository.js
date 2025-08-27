@@ -7,6 +7,14 @@ class KidStudentRepository {
     });
   }
 
+  async updateById(id, data) {
+  const student = await KidStudent.findByPk(id)
+  if (!student) {
+    throw new Error(`Không tìm thấy học sinh với ID ${id}`);
+  }
+  return student.update(data);
+}
+
   async findAllPaging(offset = 0, limit = 10, searchTerm = "") {
     let includeCondition = [
       {

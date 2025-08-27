@@ -5,6 +5,7 @@ const StudentReadingRepository = require("../repositories/StudentReading.reposit
 const UserRepository = require("../repositories/User.repository.js");
 const db = require("../models");
 const messageManager = require("../helpers/MessageManager.helper.js");
+const { uploadToMinIO } = require("../helpers/UploadToMinIO.helper.js");
 
 const validateKidStudentData = (data) => {
   if (!data.name || data.name.trim() === "") {
@@ -109,6 +110,36 @@ async function getByParentIdM(req, res) {
     return messageManager.fetchSuccess("student", child_profiles);
   } catch (error) {
     return messageManager.fetchFailed("student");
+  }
+}
+
+async function parentUpdateChild(req, res) {
+  try {
+    const { name, gender, dob, grade_id } = req.body;
+    console.log(req.body);
+    console.log(req.file);
+    const id = req.params.id;
+    if (!id || isNaN(id)) {
+      return messageManager.notFound("student", res);
+    }
+    const exists = await db.KidStudent.findByPk(id);
+    if (!exists) {
+      return messageManager.notFound("user", res);
+    }
+    let imageUrl = exists.image;
+    if (req.file) {
+      imageUrl = await uploadToMinIO(req.file, "kid_student");
+    }
+    const updatedChild = await KidStudentRepository.updateById(id, {
+      grade_id: grade_id,
+      name: name,
+      image: imageUrl,
+      gender: gender,
+      dob: dob,
+    });
+    return messageManager.updateSuccess("student", updatedChild, res);
+  } catch (error) {
+    return messageManager.updateFailed("student", res);
   }
 }
 
@@ -219,4 +250,5 @@ module.exports = {
   parentCreateChild,
   getStudentsParents,
   toggleStatus,
+  parentUpdateChild
 };

@@ -269,8 +269,8 @@ async function update(req, res) {
     if (req.file) {
       imageUrl = await uploadToMinIO(req.file, "users");
     }
-    await db.User.update({ ...updateData, image: imageUrl }, { where: { id } });
-  return messageManager.updateSuccess("user", null, res);
+    const updatedUser = await exists.update({ ...updateData, image: imageUrl });
+  return messageManager.updateSuccess("user", updatedUser, res);
   } catch (error) {
   return messageManager.updateFailed("user", res, error.message);
   }

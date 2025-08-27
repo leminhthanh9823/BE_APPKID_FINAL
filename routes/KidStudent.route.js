@@ -3,6 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/KidStudent.controller.js");
 const jwtMiddleware = require("../middlewares/Auth.middleware.js");
 const { adminOrTeacher } = require("../middlewares/Role.middleware.js");
+const upload = require("../middlewares/File.middleware.js");
 
 router.post("/all", jwtMiddleware, controller.getAll);
 router.get("/:id", jwtMiddleware, controller.getById);
@@ -14,6 +15,12 @@ router.post(
   "/parent/create-child",
   jwtMiddleware,
   controller.parentCreateChild
+);
+router.post(
+  "/parent/update-child/:id",
+  upload.single("image"),
+  jwtMiddleware,
+  controller.parentUpdateChild
 );
 router.post("/students-parents", jwtMiddleware, controller.getStudentsParents);
 router.put("/:id/update-status", jwtMiddleware, adminOrTeacher, controller.toggleStatus);
