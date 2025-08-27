@@ -331,32 +331,19 @@ async function toggleStatus(req, res) {
 
 async function getAllTeacher(req, res) {
   try {
-    const { pageNumb = 1, pageSize = 10, searchTerm = "" } = req.body || {};
-    const offset = (pageNumb - 1) * pageSize;
     const teacherRoleId = 2;
-    const { rows, count } = await repository.findAllPaging(
-      offset,
-      pageSize,
-      searchTerm,
-      teacherRoleId
-    );
-    const transformedRows = rows.map((user) => {
-      const userObject = user.toJSON ? user.toJSON() : { ...user };
-      return {
-        ...userObject,
-        password: undefined,
-        status: userObject.status,
-        email_verified_at: formatDateToYYYYMMDD(userObject.email_verified_at),
-        created_at: formatDateToYYYYMMDD(userObject.created_at),
-      };
+    const teachers = await repository.findAll({
+      where: { role_id: teacherRoleId },
+      attributes: ["id", "name", "email", "phone"], // chỉ lấy field cần
     });
-    return messageManager.fetchSuccess("teacher", {
-      records: transformedRows,
-      total_record: count,
-      total_page: Math.ceil(count / pageSize),
-    }, res);
+
+    return messageManager.fetchSuccess(
+      "teacher",
+      { records: teachers },
+      res
+    );
   } catch (error) {
-  return messageManager.fetchFailed("teacher", res, error.message);
+    return messageManager.fetchFailed("teacher", res, error.message);
   }
 }
 
