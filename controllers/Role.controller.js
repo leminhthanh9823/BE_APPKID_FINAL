@@ -4,7 +4,6 @@ exports.getAllRoles = async (req, res) => {
       { role_id: 1, name: "admin" },
       { role_id: 2, name: "teacher" },
       { role_id: 3, name: "parent" },
-      { role_id: 4, name: "student" },
     ];
 
     return res.json({
