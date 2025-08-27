@@ -15,34 +15,21 @@ exports.sendFeedback = async (req, res) => {
       return res
         .status(400)
         .json(
-          messageManager.validationFailed("feedback", ["User is invalid"])
+          messageManager.validationFailed("feedback", res, "User is invalid")
         );
     }
     let feedback_category_id = 1;
-    let reading_title = null;
     if (reading_id == undefined || reading_id == null) {
       feedback_category_id = 0;
-    } else {
-      const reading = await db.KidReading.findOne({
-        where: { id: reading_id },
-        attributes: ["title"],
-      });
-      reading_title = reading.title;
-    }
-
+    } 
     const sequelize = db.sequelize;
     const transaction = await sequelize.transaction();
 
     try {
-      let parent = await db.User.findOne({
-        where: { id: user_id },
-        attributes: ["id", "name"],
-      });
-
       const feedback = await FeedbackRepo.sendFeedback({
         user_id,
         reading_id,
-        comment: parent?.name + " - " + reading_title + ": " + comment,
+        comment: comment,
         rating,
         feedback_category_id,
         is_important: 0,
