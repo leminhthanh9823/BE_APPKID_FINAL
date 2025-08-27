@@ -332,7 +332,7 @@ async function createKidReading(req, res) {
       await db.ReadingCategoryRelations.bulkCreate(categoryRelations, {
         transaction,
       });
-      if (is_send_notify == true) {
+      if (is_send_notify == true || is_send_notify == "true") {
         let grade_id = await KidReadingRepository.findGradesByCategoryIds(categoryIdsToProcess)
         let sendDate = new Date(Date.now() + 60 * 1000);
         let newNotification = await db.Notify.create(
