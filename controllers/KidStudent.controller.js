@@ -129,9 +129,9 @@ async function parentCreateChild(req, res) {
       gender: gender,
       dob: dob,
     });
-    return messageManager.createSuccess("student", newChild);
+    return messageManager.createSuccess("student", newChild, res);
   } catch (error) {
-    return messageManager.createFailed("student");
+    return messageManager.createFailed("student", res);
   }
 }
 
