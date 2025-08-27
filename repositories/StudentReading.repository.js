@@ -186,6 +186,15 @@ class StudentReadingRepository {
       throw error;
     }
   }
+
+  async checkIsPracticed(kid_reading_id){
+    const reading = await StudentReading.findOne({
+      where: { id: kid_reading_id },
+      attributes: ['id']
+    });
+
+    return reading !== null;
+  }
 }
 
 module.exports = new StudentReadingRepository();

@@ -4,6 +4,7 @@ const KidStudentDetailsRepository = require("../repositories/KidStudentDetails.r
 const KidQuestionRepository = require("../repositories/KidQuestion.repository");
 const KidReadingRepository = require("../repositories/KidReading.repository.js");
 const OptionRepository = require("../repositories/Option.repository.js");
+const StudentReadingRepository = require("../repositories/StudentReading.repository.js");
 const KidQuestion = db.Question;
 const Option = db.Option;
 
@@ -376,7 +377,7 @@ async function getByReadingIdCMS(req, res) {
 async function checkIsPracticed(req, res) {
   try {
     const { id } = req.body || {};
-    let isPracticed = await KidReadingRepository.checkIsPracticed(id);
+    let isPracticed = await StudentReadingRepository.checkIsPracticed(id);
     return messageManager.fetchSuccess("question", { isPracticed }, res);
   } catch (error) {
   return messageManager.fetchFailed("question", res, error.message);
@@ -390,8 +391,15 @@ async function updateQuestionAndOptions(req, res) {
       id,
       kid_reading_id,
     } = req.body;
+    if (!id || isNaN(id)) {
+      return messageManager.validationFailed("question", res, "Question is not valid");
+    }
 
-    let isPracticed = await KidReadingRepository.checkIsPracticed(kid_reading_id);
+    if (!kid_reading_id || isNaN(kid_reading_id)) {
+      return messageManager.validationFailed("question", res, "Reading is not valid");
+    }
+
+    let isPracticed = await StudentReadingRepository.checkIsPracticed(kid_reading_id);
     if (isPracticed) {
       let {
         question_level_id,
