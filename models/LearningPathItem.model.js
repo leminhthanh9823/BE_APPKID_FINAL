@@ -20,7 +20,6 @@ module.exports = (sequelize, DataTypes) => {
     sequence_order: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      comment: 'Thứ tự trong lộ trình'
     },
     unlock_condition: {
       type: DataTypes.TINYINT,

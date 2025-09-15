@@ -17,11 +17,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 1,
-      validate: {
-        min: 1,
-        max: 5
-      },
-      comment: 'Cấp độ khó của lộ trình'
     },
     is_active: {
       type: DataTypes.TINYINT,

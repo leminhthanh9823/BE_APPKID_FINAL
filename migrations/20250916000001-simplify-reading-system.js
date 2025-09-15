@@ -6,16 +6,14 @@ module.exports = {
     // 1. Thêm category_id vào kid_readings table  
     await queryInterface.addColumn('kid_readings', 'category_id', {
       type: Sequelize.BIGINT.UNSIGNED,
-      allowNull: false,
-      comment: 'ID danh mục - mỗi reading chỉ thuộc 1 category'
+      allowNull: false
     });
 
     // Thêm difficulty_level vào kid_readings nếu chưa có
     await queryInterface.addColumn('kid_readings', 'difficulty_level', {
       type: Sequelize.INTEGER,
       allowNull: false,
-      defaultValue: 1,
-      comment: 'Cấp độ khó: 1=Rất dễ, 2=Dễ, 3=Trung bình, 4=Khó, 5=Rất khó'
+      defaultValue: 1
     });
 
     // Thêm foreign key constraint cho category_id
@@ -43,18 +41,15 @@ module.exports = {
       },
       name: {
         type: Sequelize.STRING(255),
-        allowNull: false,
-        comment: 'Tên game'
+        allowNull: false
       },
       description: {
         type: Sequelize.TEXT,
-        allowNull: true,
-        comment: 'Mô tả game'
+        allowNull: true
       },
       type: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        comment: 'Loại game'
+        allowNull: false
       },
       is_active: {
         type: Sequelize.TINYINT,
@@ -81,19 +76,16 @@ module.exports = {
       },
       name: {
         type: Sequelize.STRING(255),
-        allowNull: false,
-        comment: 'Tên lộ trình học tập'
+        allowNull: false
       },
       description: {
         type: Sequelize.TEXT,
-        allowNull: true,
-        comment: 'Mô tả lộ trình'
+        allowNull: true
       },
       difficulty_level: {
         type: Sequelize.INTEGER,
         allowNull: true,
-        defaultValue: 1,
-        comment: 'Cấp độ khó của lộ trình'
+        defaultValue: 1
       },
       is_active: {
         type: Sequelize.TINYINT,
@@ -120,29 +112,24 @@ module.exports = {
       },
       learning_path_id: {
         type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: false,
-        comment: 'ID lộ trình học tập'
+        allowNull: false
       },
       reading_id: {
         type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: true,
-        comment: 'ID tài liệu đọc (nullable vì có thể là game)'
+        allowNull: true
       },
       game_id: {
         type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: true,
-        comment: 'ID game (nullable vì có thể là reading)'
+        allowNull: true
       },
       sequence_order: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        comment: 'Thứ tự trong lộ trình'
+        allowNull: false
       },
       unlock_condition: {
         type: Sequelize.TINYINT,
         allowNull: false,
-        defaultValue: 0,
-        comment: '0=không khóa, 1=có khóa (cần hoàn thành bài trước)'
+        defaultValue: 0
       },
       is_active: {
         type: Sequelize.TINYINT,
@@ -220,13 +207,11 @@ module.exports = {
       },
       reading_id: {
         type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: false,
-        comment: 'Tài liệu cần điều kiện tiên quyết'
+        allowNull: false
       },
       prerequisite_reading_id: {
         type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: false,
-        comment: 'Tài liệu tiên quyết cần hoàn thành trước (điểm >= 60%)'
+        allowNull: false
       },
       is_active: {
         type: Sequelize.TINYINT,
