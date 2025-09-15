@@ -160,7 +160,6 @@ async function getStudentsParents(req, res) {
       };
     });
     let totalReadingsEachGrade = await KidReadingRepository.countTotalReadingsEachGrades();
-    console.log(totalReadingsEachGrade)
     
     let passedList = await StudentReadingRepository.getPassedCountsByStudentId(
       result.map((r) => r.student_id)

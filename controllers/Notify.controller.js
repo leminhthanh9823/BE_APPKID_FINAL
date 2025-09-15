@@ -16,7 +16,7 @@ function validateNotificationData(data) {
     return "Content must be less than 1000 characters";
   }
   if (data.is_active === undefined || data.is_active === null) {
-    return "Please select status";
+    return "Please select one status";
   }
   if (data.type_target === 1 && (!Array.isArray(data.grades) || data.grades.length === 0)) {
     return "Please select at least one grade";

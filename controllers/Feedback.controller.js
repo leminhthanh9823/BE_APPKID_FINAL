@@ -266,7 +266,7 @@ exports.updateAssignFeedback = async (req, res) => {
         );
 
         if (!emailSolveSent || !emailConfirmSent) {
-          throw new Error("Error sending email to solver or confirmer.");
+          throw new Error("Error sending email");
         }
       }
 

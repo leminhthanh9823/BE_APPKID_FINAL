@@ -160,8 +160,8 @@ class AuthController {
     const validationError = validateUser({username, password })
 
 
-    if (!username || !password) {
-      return messageManager.validationFailed("user", res, "Please provide username and password");
+    if (validationError) {
+      return messageManager.validationFailed("user", res, validationError);
     }
 
     try {
@@ -172,7 +172,7 @@ class AuthController {
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
-        return messageManager.validationFailed("user", res, "Password is incorrect");
+        return messageManager.validationFailed("user", res, "The password is incorrect");
       }
 
       if(user.status == 0){
@@ -252,7 +252,7 @@ class AuthController {
     try {
       const user = await userRepository.findByEmail(email);
       if (user == null) {
-        return messageManager.validationFailed("user", res, "Email is invalid");
+        return messageManager.validationFailed("user", res, "Email does not exist in the system.");
       }
 
       const resetToken = jwt.sign(
