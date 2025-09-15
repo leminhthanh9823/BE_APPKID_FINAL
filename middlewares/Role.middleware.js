@@ -20,7 +20,7 @@ const checkRole = (allowedRoles) => {
       if (!req.user || !req.user.id) {
         return res.status(401).json({
           success: false,
-          message: "Unauthorized: No user information found",
+          message: "The username does not exist in the system",
         });
       }
 
@@ -53,7 +53,7 @@ const checkRole = (allowedRoles) => {
       if (!rolesArray.includes(user.role_id)) {
         return res.status(403).json({
           success: false,
-          message: "Forbidden: Insufficient permissions for this resource",
+          message: "You have no permission to access.",
           userRole: user.role_id,
           requiredRoles: rolesArray,
         });
