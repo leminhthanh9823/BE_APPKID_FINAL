@@ -29,6 +29,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true
     },
+    learning_path_id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false
+    },
     is_active: {
       type: DataTypes.TINYINT,
       allowNull: false,
@@ -49,6 +53,32 @@ module.exports = (sequelize, DataTypes) => {
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
+
+  StudentReading.associate = function (models) {
+    // Belongs to student
+    StudentReading.belongsTo(models.KidStudent, {
+      foreignKey: 'kid_student_id',
+      as: 'student'
+    });
+    
+    // Belongs to reading
+    StudentReading.belongsTo(models.KidReading, {
+      foreignKey: 'kid_reading_id',
+      as: 'reading'
+    });
+    
+    // Belongs to learning path (optional)
+    StudentReading.belongsTo(models.LearningPath, {
+      foreignKey: 'learning_path_id',
+      as: 'learningPath'
+    });
+    
+    // Has many reading details
+    StudentReading.hasMany(models.StudentReadingDetail, {
+      foreignKey: 'student_reading_id',
+      as: 'details'
+    });
+  };
 
   return StudentReading;
 };
