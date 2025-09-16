@@ -56,9 +56,28 @@ module.exports = (sequelize, DataTypes) => {
     });
     
     // Has feedback
+    // Belongs to one category only
+    KidReading.belongsTo(models.ReadingCategory, {
+      foreignKey: "category_id",
+      as: "category",
+    });
+    
+    // Has feedback
     KidReading.hasMany(models.Feedback, {
       foreignKey: "reading_id",
       as: "feedbacks",
+    });
+    
+    // Learning path relationships
+    KidReading.hasMany(models.LearningPathItem, {
+      foreignKey: "reading_id",
+      as: "learningPathItems",
+    });
+    
+    // Student readings
+    KidReading.hasMany(models.StudentReading, {
+      foreignKey: "kid_reading_id",
+      as: "studentReadings",
     });
     
     // Learning path relationships

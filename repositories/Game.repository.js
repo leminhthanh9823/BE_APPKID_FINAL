@@ -1,42 +1,54 @@
-const { Game } = require('../models');
+const { Game, GameWord } = require('../models');
 
 class GameRepository {
-  async createGame(data) {
-    return await Game.create(data);
+  async createGame(gameData, words = []) {
+    const game = await Game.create(gameData);
+
+    if (words.length > 0) {
+      const wordDocs = words.map(w => ({ word: w, gameId: game._id }));
+      await GameWord.insertMany(wordDocs);
+    }
+
+    return game;
   }
 
-  async getGames(page = 1, size = 10) {
-    const limit = size;
-    const offset = (page - 1) * size;
+  async getGames(page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const [games, total] = await Promise.all([
+      Game.find().skip(skip).limit(limit),
+      Game.countDocuments()
+    ]);
 
-    const { rows, count } = await Game.findAndCountAll({
-      limit,
-      offset,
-      order: [['created_at', 'DESC']]
-    });
-
-    return {
-      games: rows,
-      totalItems: count,
-      totalPages: Math.ceil(count / size),
-      currentPage: page
-    };
+    return { games, total, page, limit };
   }
 
   async getGameById(id) {
-    return await Game.findByPk(id);
+    const game = await Game.findById(id);
+    if (!game) return null;
+
+    const words = await GameWord.find({ gameId: id });
+    return { ...game.toObject(), words };
   }
 
-  async updateGame(id, data) {
-    const game = await Game.findByPk(id);
+  async updateGame(id, updateData, words = null) {
+    const game = await Game.findByIdAndUpdate(id, updateData, { new: true });
+
     if (!game) return null;
-    return await game.update(data);
+
+    if (Array.isArray(words)) {
+      await GameWord.deleteMany({ gameId: id });
+      const wordDocs = words.map(w => ({ word: w, gameId: id }));
+      await GameWord.insertMany(wordDocs);
+    }
+
+    return game;
   }
 
   async deleteGame(id) {
-    const game = await Game.findByPk(id);
+    const game = await Game.findByIdAndDelete(id);
     if (!game) return null;
-    await game.destroy();
+
+    await GameWord.deleteMany({ gameId: id });
     return game;
   }
 }

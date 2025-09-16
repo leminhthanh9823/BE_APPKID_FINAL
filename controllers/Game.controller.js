@@ -3,50 +3,55 @@ const gameRepository = require('../repositories/Game.repository');
 class GameController {
   async create(req, res) {
     try {
-      const game = await gameRepository.createGame(req.body);
-      res.status(201).json({ message: 'Game created successfully', game });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to create game', error: error.message });
+      const { name, type, description, words } = req.body;
+      const game = await gameRepo.createGame({ name, type, description }, words);
+      res.status(201).json({ success: true, data: game });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 
   async list(req, res) {
     try {
-      const { page = 1, size = 10 } = req.query;
-      const result = await gameRepository.getGames(parseInt(page), parseInt(size));
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch games', error: error.message });
+      const { page = 1, limit = 10 } = req.query;
+      const result = await gameRepo.getGames(Number(page), Number(limit));
+      res.json({ success: true, ...result });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 
-  async getOne(req, res) {
+  async detail(req, res) {
     try {
-      const game = await gameRepository.getGameById(req.params.id);
-      if (!game) return res.status(404).json({ message: 'Game not found' });
-      res.json(game);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch game', error: error.message });
+      const { id } = req.params;
+      const game = await gameRepo.getGameById(id);
+      if (!game) return res.status(404).json({ success: false, message: "Game not found" });
+      res.json({ success: true, data: game });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 
   async update(req, res) {
     try {
-      const game = await gameRepository.updateGame(req.params.id, req.body);
-      if (!game) return res.status(404).json({ message: 'Game not found' });
-      res.json({ message: 'Game updated successfully', game });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to update game', error: error.message });
+      const { id } = req.params;
+      const { name, type, description, words } = req.body;
+      const game = await gameRepo.updateGame(id, { name, type, description }, words);
+      if (!game) return res.status(404).json({ success: false, message: "Game not found" });
+      res.json({ success: true, data: game });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 
   async delete(req, res) {
     try {
-      const game = await gameRepository.deleteGame(req.params.id);
-      if (!game) return res.status(404).json({ message: 'Game not found' });
-      res.json({ message: 'Game deleted successfully' });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to delete game', error: error.message });
+      const { id } = req.params;
+      const game = await gameRepo.deleteGame(id);
+      if (!game) return res.status(404).json({ success: false, message: "Game not found" });
+      res.json({ success: true, message: "Game deleted successfully" });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 }
