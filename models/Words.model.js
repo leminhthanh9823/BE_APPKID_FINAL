@@ -22,14 +22,6 @@ module.exports = (sequelize, DataTypes) => {
         max: 5
       }
     },
-    definition: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    pronunciation: {
-      type: DataTypes.STRING(255),
-      allowNull: true
-    },
     note: {
       type: DataTypes.TEXT,
       allowNull: true
@@ -37,9 +29,6 @@ module.exports = (sequelize, DataTypes) => {
     type: {
       type: DataTypes.TINYINT,
       allowNull: false,
-      validate: {
-        isIn: [[0, 1, 2]] // 0=noun, 1=verb, 2=adjective
-      }
     },
     is_active: {
       type: DataTypes.TINYINT,
