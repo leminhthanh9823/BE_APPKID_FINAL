@@ -5,7 +5,6 @@ module.exports = (sequelize, DataTypes) => {
       id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
       title: DataTypes.STRING(255),
       description: DataTypes.TEXT,
-      grade_id: DataTypes.INTEGER,
       image: {
         type: DataTypes.STRING(255),
       },
@@ -32,6 +31,14 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: "updated_at",
     }
   );
+
+  ReadingCategory.associate = function (models) {
+    // Has many readings (one-to-many relationship)
+    ReadingCategory.hasMany(models.KidReading, {
+      foreignKey: 'category_id',
+      as: 'readings'
+    });
+  };
 
   return ReadingCategory;
 };
