@@ -49,6 +49,15 @@ db.StudentReadingDetail = require("./StudentReadingDetail.model")(
 db.Notify = require("./Notify.model")(sequelize, Sequelize);
 db.NotifyTarget = require("./NotifyTarget.model")(sequelize, Sequelize);
 
+// Game and Learning Path models
+db.Game = require("./Game.model")(sequelize, Sequelize);
+db.LearningPath = require("./LearningPath.model")(sequelize, Sequelize);
+db.LearningPathItem = require("./LearningPathItem.model")(sequelize, Sequelize);
+
+// Words models
+db.Word = require("./Words.model")(sequelize, Sequelize);
+db.GameWord = require("./GameWords.model")(sequelize, Sequelize);
+
 db.User.associate && db.User.associate(db);
 db.Feedback.associate && db.Feedback.associate(db);
 db.FeedbackSolve.associate && db.FeedbackSolve.associate(db);
@@ -56,6 +65,13 @@ db.FeedbackCategory.associate && db.FeedbackCategory.associate(db);
 db.KidReading.associate && db.KidReading.associate(db);
 db.Notify.associate && db.Notify.associate(db);
 db.NotifyTarget.associate && db.NotifyTarget.associate(db);
+
+// Associate new models
+db.Game.associate && db.Game.associate(db);
+db.LearningPath.associate && db.LearningPath.associate(db);
+db.LearningPathItem.associate && db.LearningPathItem.associate(db);
+db.Word.associate && db.Word.associate(db);
+db.GameWord.associate && db.GameWord.associate(db);
 // Relationships
 
 // Questions & Options
