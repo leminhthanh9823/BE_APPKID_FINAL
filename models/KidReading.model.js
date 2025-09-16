@@ -61,17 +61,6 @@ module.exports = (sequelize, DataTypes) => {
       as: "feedbacks",
     });
     
-    // Prerequisites relationships
-    KidReading.hasMany(models.ReadingPrerequisite, {
-      foreignKey: "reading_id",
-      as: "prerequisites",
-    });
-    
-    KidReading.hasMany(models.ReadingPrerequisite, {
-      foreignKey: "prerequisite_reading_id",
-      as: "prerequisiteFor",
-    });
-    
     // Learning path relationships
     KidReading.hasMany(models.LearningPathItem, {
       foreignKey: "reading_id",
