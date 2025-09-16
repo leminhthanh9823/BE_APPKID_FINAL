@@ -13,6 +13,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    image: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
     difficulty_level: {
       type: DataTypes.INTEGER,
       allowNull: true,

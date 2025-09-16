@@ -51,6 +51,10 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false
       },
+      prerequisite_reading_id: {
+        type: Sequelize.BIGINT.UNSIGNED,
+        allowNull: true
+      },
       is_active: {
         type: Sequelize.TINYINT,
         allowNull: false,
@@ -80,6 +84,10 @@ module.exports = {
       },
       description: {
         type: Sequelize.TEXT,
+        allowNull: true
+      },
+      image: {
+        type: Sequelize.STRING(255),
         allowNull: true
       },
       difficulty_level: {
@@ -172,6 +180,19 @@ module.exports = {
       onUpdate: 'CASCADE'
     });
 
+    // Add foreign key for prerequisite_reading_id in games
+    await queryInterface.addConstraint('games', {
+      fields: ['prerequisite_reading_id'],
+      type: 'foreign key',
+      name: 'fk_games_prerequisite_reading_id',
+      references: {
+        table: 'kid_readings',
+        field: 'id'
+      },
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
+    });
+
     // Add foreign key for game_id
     await queryInterface.addConstraint('learning_path_items', {
       fields: ['game_id'],
@@ -198,66 +219,15 @@ module.exports = {
       }
     });
 
-    // 6. Tạo bảng reading_prerequisites
-    await queryInterface.createTable('reading_prerequisites', {
-      id: {
-        type: Sequelize.BIGINT.UNSIGNED,
-        primaryKey: true,
-        autoIncrement: true
-      },
-      reading_id: {
-        type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: false
-      },
-      prerequisite_reading_id: {
-        type: Sequelize.BIGINT.UNSIGNED,
-        allowNull: false
-      },
-      is_active: {
-        type: Sequelize.TINYINT,
-        allowNull: false,
-        defaultValue: 1
-      },
-      created_at: {
-        type: Sequelize.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-      },
-      updated_at: {
-        type: Sequelize.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        onUpdate: Sequelize.literal('CURRENT_TIMESTAMP')
-      }
-    });
-
-    // Thêm foreign keys cho reading_prerequisites
-    await queryInterface.addConstraint('reading_prerequisites', {
-      fields: ['reading_id'],
-      type: 'foreign key',
-      name: 'fk_reading_prerequisites_reading_id',
-      references: {
-        table: 'kid_readings',
-        field: 'id'
-      },
-      onDelete: 'CASCADE',
-      onUpdate: 'CASCADE'
-    });
-
-    await queryInterface.addConstraint('reading_prerequisites', {
-      fields: ['prerequisite_reading_id'],
-      type: 'foreign key',
-      name: 'fk_reading_prerequisites_prereq_id',
-      references: {
-        table: 'kid_readings',
-        field: 'id'
-      },
-      onDelete: 'CASCADE',
-      onUpdate: 'CASCADE'
-    });
-
-    // 7. Thêm learning_path_id vào student_readings
+    // 8. Thêm indexes để tối ưu performance
     await queryInterface.addColumn('student_readings', 'learning_path_id', {
       type: Sequelize.BIGINT.UNSIGNED,
       allowNull: false,
+    });
+
+    await queryInterface.addColumn('student_readings', 'game_id', {
+      type: Sequelize.BIGINT.UNSIGNED,
+      allowNull: true,
     });
 
     await queryInterface.addConstraint('student_readings', {
@@ -266,6 +236,18 @@ module.exports = {
       name: 'fk_student_readings_learning_path_id',
       references: {
         table: 'learning_paths',
+        field: 'id'
+      },
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
+    });
+
+    await queryInterface.addConstraint('student_readings', {
+      fields: ['game_id'],
+      type: 'foreign key',
+      name: 'fk_student_readings_game_id',
+      references: {
+        table: 'games',
         field: 'id'
       },
       onDelete: 'SET NULL',
@@ -301,12 +283,16 @@ module.exports = {
       name: 'idx_learning_path_items_game_id'
     });
 
-    await queryInterface.addIndex('reading_prerequisites', ['reading_id'], {
-      name: 'idx_reading_prerequisites_reading_id'
-    });
-
     await queryInterface.addIndex('student_readings', ['learning_path_id'], {
       name: 'idx_student_readings_learning_path_id'
+    });
+
+    await queryInterface.addIndex('student_readings', ['game_id'], {
+      name: 'idx_student_readings_game_id'
+    });
+
+    await queryInterface.addIndex('games', ['prerequisite_reading_id'], {
+      name: 'idx_games_prerequisite_reading_id'
     });
   },
 
@@ -314,8 +300,9 @@ module.exports = {
     // Rollback - xóa những gì đã thêm
 
     // 1. Remove indexes
+    await queryInterface.removeIndex('games', 'idx_games_prerequisite_reading_id');
+    await queryInterface.removeIndex('student_readings', 'idx_student_readings_game_id');
     await queryInterface.removeIndex('student_readings', 'idx_student_readings_learning_path_id');
-    await queryInterface.removeIndex('reading_prerequisites', 'idx_reading_prerequisites_reading_id');
     await queryInterface.removeIndex('learning_path_items', 'idx_learning_path_items_game_id');
     await queryInterface.removeIndex('learning_path_items', 'idx_learning_path_items_reading_id');
     await queryInterface.removeIndex('learning_path_items', 'idx_learning_path_items_path_sequence');
@@ -325,11 +312,14 @@ module.exports = {
     await queryInterface.removeIndex('kid_readings', 'idx_kid_readings_category_id');
 
     // 2. Remove foreign key constraints and columns
+    await queryInterface.removeConstraint('student_readings', 'fk_student_readings_game_id');
     await queryInterface.removeConstraint('student_readings', 'fk_student_readings_learning_path_id');
+    await queryInterface.removeColumn('student_readings', 'game_id');
     await queryInterface.removeColumn('student_readings', 'learning_path_id');
 
-    // 3. Drop reading_prerequisites table
-    await queryInterface.dropTable('reading_prerequisites');
+    // 3. Remove games constraints
+    await queryInterface.removeConstraint('games', 'fk_games_prerequisite_reading_id');
+    await queryInterface.removeColumn('games', 'prerequisite_reading_id');
 
     // 4. Drop learning_path_items table  
     await queryInterface.dropTable('learning_path_items');
@@ -346,7 +336,7 @@ module.exports = {
       allowNull: true
     });
 
-    // 8. Remove category_id from kid_readings
+    // 8. Remove category_id from kid_readings and add back image column to learning_paths
     await queryInterface.removeConstraint('kid_readings', 'fk_kid_readings_category_id');
     await queryInterface.removeColumn('kid_readings', 'category_id');
     await queryInterface.removeColumn('kid_readings', 'difficulty_level');

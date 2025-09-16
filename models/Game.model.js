@@ -17,6 +17,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    prerequisite_reading_id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: true
+    },
     is_active: {
       type: DataTypes.TINYINT,
       allowNull: false,
@@ -43,6 +47,18 @@ module.exports = (sequelize, DataTypes) => {
     Game.hasMany(models.LearningPathItem, {
       foreignKey: 'game_id',
       as: 'learningPathItems'
+    });
+    
+    // Belongs to prerequisite reading
+    Game.belongsTo(models.KidReading, {
+      foreignKey: 'prerequisite_reading_id',
+      as: 'prerequisiteReading'
+    });
+    
+    // Has many student readings (for game progress)
+    Game.hasMany(models.StudentReading, {
+      foreignKey: 'game_id',
+      as: 'studentReadings'
     });
   };
 

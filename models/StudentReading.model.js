@@ -33,6 +33,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false
     },
+    game_id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: true
+    },
     is_active: {
       type: DataTypes.TINYINT,
       allowNull: false,
@@ -71,6 +75,12 @@ module.exports = (sequelize, DataTypes) => {
     StudentReading.belongsTo(models.LearningPath, {
       foreignKey: 'learning_path_id',
       as: 'learningPath'
+    });
+    
+    // Belongs to game (optional)
+    StudentReading.belongsTo(models.Game, {
+      foreignKey: 'game_id',
+      as: 'game'
     });
     
     // Has many reading details
