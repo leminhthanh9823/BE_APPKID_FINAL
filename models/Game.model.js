@@ -60,6 +60,20 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'game_id',
       as: 'studentReadings'
     });
+    
+    // Has many game words (many-to-many with words through game_words)
+    Game.hasMany(models.GameWord, {
+      foreignKey: 'game_id',
+      as: 'gameWords'
+    });
+    
+    // Many-to-many relationship with words
+    Game.belongsToMany(models.Word, {
+      through: models.GameWord,
+      foreignKey: 'game_id',
+      otherKey: 'word_id',
+      as: 'words'
+    });
   };
 
   return Game;
