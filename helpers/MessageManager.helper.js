@@ -19,6 +19,7 @@ class MessageManager {
       role: "role",
       grade: "grade",
       notification: "notification",
+      advice: "advice",
     };
   }
 
