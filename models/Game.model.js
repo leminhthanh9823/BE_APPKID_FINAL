@@ -46,7 +46,9 @@ module.exports = (sequelize, DataTypes) => {
     // Has many learning path items
     Game.hasMany(models.LearningPathItem, {
       foreignKey: 'game_id',
-      as: 'learningPathItems'
+      as: 'learningPathItems',
+      onDelete: "CASCADE",
+      hooks: true
     });
     
     // Belongs to prerequisite reading
@@ -64,7 +66,9 @@ module.exports = (sequelize, DataTypes) => {
     // Has many game words (many-to-many with words through game_words)
     Game.hasMany(models.GameWord, {
       foreignKey: 'game_id',
-      as: 'gameWords'
+      as: 'gameWords',
+      onDelete: "CASCADE",
+      hooks: true
     });
     
     // Many-to-many relationship with words

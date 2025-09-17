@@ -24,6 +24,7 @@ const DashboardRoute = require("./routes/Dashboard.route");
 const NotifyRoute = require("./routes/Notify.route");
 const FeedbackRoute = require("./routes/Feedback.route");
 const GameRoute = require("./routes/Game.route");
+const WordRoute = require("./routes/Word.routes");
 
 app.use(express.json({ limit: "400mb" }));
 
@@ -52,6 +53,7 @@ app.use("/api/dashboard", DashboardRoute);
 app.use("/api/notify", NotifyRoute);
 app.use("/api/feedback", FeedbackRoute);
 app.use("/games", GameRoute);
+app.use("/words", WordRoute);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -55,7 +55,9 @@ module.exports = (sequelize, DataTypes) => {
     // Has many game words (many-to-many with games through game_words)
     Word.hasMany(models.GameWord, {
       foreignKey: 'word_id',
-      as: 'gameWords'
+      as: 'gameWords',
+      onDelete: "CASCADE",
+      hooks: true
     });
     
     // Many-to-many relationship with games
