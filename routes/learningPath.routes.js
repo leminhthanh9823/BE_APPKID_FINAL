@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const learningPathController = require("../controllers/LearningPath.controller.js");
-const learningPathItemController = require("../controllers/LearningPathItem.controller.js");
 const jwtMiddleware = require("../middlewares/Auth.middleware.js");
 const fileMiddleware = require("../middlewares/File.middleware.js");
 const { teacherOnly } = require("../middlewares/Role.middleware.js");
