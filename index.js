@@ -53,7 +53,7 @@ app.use("/api/dashboard", DashboardRoute);
 app.use("/api/notify", NotifyRoute);
 app.use("/api/feedback", FeedbackRoute);
 app.use("/api/games", GameRoute);
-app.use("/words", WordRoute);
+app.use("/api/words", WordRoute);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
