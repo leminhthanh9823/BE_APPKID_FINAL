@@ -10,6 +10,8 @@ class MessageManager {
       ebookcategory: "e-book category",
       kidreading: "reading",
       readingcategory: "reading category",
+      learningpath: "learning path",
+      learningpathitem: "learning path item",
       user: "user",
       student: "student",
       teacher: "teacher",
