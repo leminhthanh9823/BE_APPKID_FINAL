@@ -52,7 +52,7 @@ app.use("/api/role", RoleRoute);
 app.use("/api/dashboard", DashboardRoute);
 app.use("/api/notify", NotifyRoute);
 app.use("/api/feedback", FeedbackRoute);
-app.use("/games", GameRoute);
+app.use("/api/games", GameRoute);
 app.use("/words", WordRoute);
 
 app.listen(PORT, () => {

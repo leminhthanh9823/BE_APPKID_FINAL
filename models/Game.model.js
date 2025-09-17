@@ -21,10 +21,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: true
     },
+    sequence_order: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     is_active: {
       type: DataTypes.TINYINT,
       allowNull: false,
-      defaultValue: 1
+      defaultValue: 0
     },
     created_at: {
       type: DataTypes.DATE,

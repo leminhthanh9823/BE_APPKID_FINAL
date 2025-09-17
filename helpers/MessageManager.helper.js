@@ -19,6 +19,8 @@ class MessageManager {
       role: "role",
       grade: "grade",
       notification: "notification",
+      game: "game",
+      word: "word",
     };
   }
 

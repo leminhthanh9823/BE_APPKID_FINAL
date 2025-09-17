@@ -1,54 +1,204 @@
-const { Game, GameWord } = require('../models');
+const { Game, GameWord, Word, sequelize } = require('../models');
+const { Op } = require('sequelize');
 
 class GameRepository {
-  async createGame(gameData, words = []) {
-    const game = await Game.create(gameData);
+  
+  async createGame(gameData, wordIds = []) {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      const maxSequenceOrder = await Game.max('sequence_order', { transaction });
+      const nextSequenceOrder = (maxSequenceOrder || 0) + 1;
+      
+      const game = await Game.create({
+        ...gameData,
+        sequence_order: nextSequenceOrder,
+        is_active: 0
+      }, { transaction });
 
-    if (words.length > 0) {
-      const wordDocs = words.map(w => ({ word: w, gameId: game._id }));
-      await GameWord.insertMany(wordDocs);
+      if (wordIds && wordIds.length > 0) {
+        const gameWords = wordIds.map((wordId, index) => ({
+          game_id: game.id,
+          word_id: wordId,
+          sequence_order: index + 1
+        }));
+        
+        await GameWord.bulkCreate(gameWords, { transaction });
+      }
+
+      await transaction.commit();
+      
+      return await this.getGameById(game.id);
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
-
-    return game;
   }
 
-  async getGames(page = 1, limit = 10) {
-    const skip = (page - 1) * limit;
-    const [games, total] = await Promise.all([
-      Game.find().skip(skip).limit(limit),
-      Game.countDocuments()
-    ]);
+  async getGames(options = {}) {
+    const {
+      page = 1,
+      limit = 10,
+      searchTerm = '',
+      status = null,
+      type = null,
+      sortBy = 'created_at',
+      sortOrder = 'DESC'
+    } = options;
 
-    return { games, total, page, limit };
+    const offset = (page - 1) * limit;
+    
+    const whereConditions = {};
+    
+    if (searchTerm) {
+      whereConditions[Op.or] = [
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { description: { [Op.like]: `%${searchTerm}%` } }
+      ];
+    }
+    
+    if (status === 'active') {
+      whereConditions.is_active = 1;
+    } else if (status === 'inactive') {
+      whereConditions.is_active = 0;
+    }
+    
+    if (type !== null) {
+      whereConditions.type = type;
+    }
+
+    const { rows: games, count } = await Game.findAndCountAll({
+      where: whereConditions,
+      include: [
+        {
+          model: GameWord,
+          as: 'gameWords',
+          include: [
+            {
+              model: Word,
+              as: 'word',
+              attributes: ['id', 'word', 'level', 'type']
+            }
+          ]
+        }
+      ],
+      order: [[sortBy, sortOrder.toUpperCase()]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      distinct: true
+    });
+
+    return {
+      games,
+      pagination: {
+        total: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page),
+        limit: parseInt(limit),
+        hasNext: page < Math.ceil(count / limit),
+        hasPrev: page > 1
+      }
+    };
   }
 
   async getGameById(id) {
-    const game = await Game.findById(id);
-    if (!game) return null;
-
-    const words = await GameWord.find({ gameId: id });
-    return { ...game.toObject(), words };
-  }
-
-  async updateGame(id, updateData, words = null) {
-    const game = await Game.findByIdAndUpdate(id, updateData, { new: true });
-
-    if (!game) return null;
-
-    if (Array.isArray(words)) {
-      await GameWord.deleteMany({ gameId: id });
-      const wordDocs = words.map(w => ({ word: w, gameId: id }));
-      await GameWord.insertMany(wordDocs);
-    }
+    const game = await Game.findByPk(id, {
+      include: [
+        {
+          model: GameWord,
+          as: 'gameWords',
+          include: [
+            {
+              model: Word,
+              as: 'word',
+              attributes: ['id', 'word', 'image', 'level', 'type', 'note']
+            }
+          ],
+          order: [['sequence_order', 'ASC']]
+        }
+      ]
+    });
 
     return game;
   }
 
-  async deleteGame(id) {
-    const game = await Game.findByIdAndDelete(id);
-    if (!game) return null;
+  async updateGame(id, updateData, wordIds = null) {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      const existingGame = await Game.findByPk(id, { transaction });
+      if (!existingGame) {
+        await transaction.rollback();
+        return null;
+      }
 
-    await GameWord.deleteMany({ gameId: id });
+      await existingGame.update(updateData, { transaction });
+
+      if (Array.isArray(wordIds)) {
+        await GameWord.destroy({
+          where: { game_id: id },
+          transaction
+        });
+
+        if (wordIds.length > 0) {
+          const gameWords = wordIds.map((wordId, index) => ({
+            game_id: id,
+            word_id: wordId,
+            sequence_order: index + 1
+          }));
+          
+          await GameWord.bulkCreate(gameWords, { transaction });
+        }
+      }
+
+      await transaction.commit();
+      
+      return await this.getGameById(id);
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async deleteGame(id) {
+    const game = await Game.findByPk(id);
+    if (!game) {
+      return null;
+    }
+
+    await game.update({ is_active: 0 });
+    
+    return game;
+  }
+
+  async getGamesByType(type) {
+    return await Game.findAll({
+      where: { type, is_active: 1 },
+      include: [
+        {
+          model: GameWord,
+          as: 'gameWords',
+          include: [
+            {
+              model: Word,
+              as: 'word'
+            }
+          ]
+        }
+      ],
+      order: [['sequence_order', 'ASC']]
+    });
+  }
+
+  async toggleStatus(id) {
+    const game = await Game.findByPk(id);
+    if (!game) {
+      return null;
+    }
+
+    const newStatus = game.is_active === 1 ? 0 : 1;
+    await game.update({ is_active: newStatus });
+    
     return game;
   }
 }
