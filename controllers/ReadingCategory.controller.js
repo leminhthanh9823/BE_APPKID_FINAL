@@ -2,7 +2,7 @@ const repository = require("../repositories/ReadingCategory.repository.js");
 const messageManager = require("../helpers/MessageManager.helper.js");
 const { uploadToMinIO } = require("../helpers/UploadToMinIO.helper.js");
 const {
-  validateReadingCategoryFiles,
+  validateImageFile,
 } = require("../helpers/FileValidation.helper.js");
 
 const sanitizeReadingCategoryData = (data) => {
@@ -134,7 +134,7 @@ async function createReadingCategory(req, res) {
       return messageManager.validationFailed("readingcategory", res, validationError);
     }
 
-    const fileValidationError = validateReadingCategoryFiles(req.files);
+    const fileValidationError = validateImageFile(req.files);
     if (fileValidationError) {
       return messageManager.validationFailed("readingcategory", res, fileValidationError);
     }
@@ -181,7 +181,7 @@ async function updateReadingCategory(req, res) {
       return messageManager.validationFailed("readingcategory", res, validationErrors);
     }
 
-    const fileValidationError = validateReadingCategoryFiles(req.files);
+    const fileValidationError = validateImageFile(req.files);
     if (fileValidationError) {
       return messageManager.validationFailed("readingcategory", res, fileValidationError);
     }

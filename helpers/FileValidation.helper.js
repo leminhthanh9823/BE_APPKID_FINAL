@@ -93,7 +93,7 @@ const validateEBookCategoryFiles = (files) => {
   return null;
 };
 
-const validateReadingCategoryFiles = (files) => {
+const validateImageFile = (files) => {
   if (files?.image && files.image[0]) {
     const imageTypeError = validateFileType(files.image[0], ["image"], "Image");
     if (imageTypeError) return imageTypeError;
@@ -130,6 +130,6 @@ module.exports = {
   validateFileSize,
   validateEBookFiles,
   validateEBookCategoryFiles,
-  validateReadingCategoryFiles,
+  validateImageFile,
   validateKidReadingFiles,
 };

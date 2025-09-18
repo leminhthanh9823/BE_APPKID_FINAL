@@ -4,6 +4,10 @@ const learningPathController = require("../controllers/LearningPath.controller.j
 const jwtMiddleware = require("../middlewares/Auth.middleware.js");
 const fileMiddleware = require("../middlewares/File.middleware.js");
 const { teacherOnly } = require("../middlewares/Role.middleware.js");
+const upload = require("../middlewares/File.middleware.js");
+const learningPathUpload = upload.fields([
+  { name: "image", maxCount: 1 },
+]);
 
 // ============= ADMIN ROUTES =============
 
@@ -21,6 +25,12 @@ router.post("/cms/all",
 router.put(
   "/:id/update-status",
   learningPathController.toggleStatus
+);
+
+// POST /create - Tạo mới learning path với image upload
+router.post("/create", 
+  learningPathUpload,
+  learningPathController.createLearningPath
 );
 
 module.exports = router;

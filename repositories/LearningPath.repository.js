@@ -99,6 +99,20 @@ class LearningPathRepository {
     };
   }
 
+  async findByName(name) {
+    return await db.LearningPath.findOne({
+      where: { 
+        name: name.trim()
+      },
+    });
+  }
+
+  async create(learningPathData, transaction = null) {
+    const options = {};
+    if (transaction) options.transaction = transaction;
+    return await db.LearningPath.create(learningPathData, options);
+  }
+
 }
 
 module.exports = new LearningPathRepository();

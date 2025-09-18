@@ -3,6 +3,7 @@ const messageManager = require("../helpers/MessageManager.helper.js");
 const { uploadToMinIO } = require("../helpers/UploadToMinIO.helper.js");
 const {
   validateKidReadingFiles,
+  validateImageFile,
 } = require("../helpers/FileValidation.helper.js");
 const db = require("../models");
 
@@ -51,37 +52,32 @@ const sanitizeLearningPathData = (data) => {
 const validateLearningPathData = (data, isUpdate = false) => {
   // Name validations
   if (!data.name || data.name.trim() === "") {
-    return "Learning path name is required"; // MSG_5
+    return "Learning path name is required"; 
   }
 
   if (data.name && data.name.length > 255) {
-    return "Learning path name cannot exceed 255 characters"; // MSG_7
+    return "Learning path name cannot exceed 255 characters"; 
   }
 
   // Description length limit as specified in UC_LP02
   if (data.description && data.description.length > 1000) {
-    return "Description cannot exceed 1000 characters"; // MSG_8
+    return "Description cannot exceed 1000 characters"; 
   }
 
   // Difficulty is required for create (but optional for update)
   if (!isUpdate && (data.difficulty_level === undefined || data.difficulty_level === null || data.difficulty_level === "")) {
-    return "Difficulty level is required"; // MSG_9
+    return "Difficulty level is required"; 
   }
 
   if (data.difficulty_level !== undefined && data.difficulty_level !== null) {
     const diff = parseInt(data.difficulty_level);
     if (isNaN(diff) || diff < 1 || diff > 5) {
-      return "Difficulty level must be between 1 and 5"; // MSG_10
+      return "Difficulty level must be between 1 and 5";
     }
   }
   return null;
 };
 
-/**
- * POST /admin/learning-paths
- * Nghiệp vụ 1: Lấy danh sách lộ trình với search/filter/sort/pagination
- * Business Rules: BR-01, BR-04, BR-09, BR-10, BR-LP01, BR-LP02
- */
 async function getAllLearningPaths(req, res) {
   try {
     // Sanitize and validate input data
@@ -170,7 +166,56 @@ async function toggleStatus(req, res) {
   }
 }
 
+async function createLearningPath(req, res) {
+  try {
+    const validationErrors = validateLearningPathData(req.body, false);
+
+    if (validationErrors) {
+      return messageManager.validationFailed('learningpath', res, validationErrors);
+    }
+
+    const imageValidationError = validateImageFile(req.files);
+    // Image validation
+    if (imageValidationError) {
+      return messageManager.validationFailed('learningpath', res, imageValidationError);
+    }
+    
+    // Check name uniqueness
+    const existingPath = await repository.findByName(req.body.name);
+    if (existingPath) {
+      return messageManager.validationFailed('learningpath', res, 'Learning path name must be unique');
+    }
+
+    // Step 5: If validation passes, save to database
+    try {
+      const imageUrl = await uploadToMinIO(req.files.image[0], "learning-paths");
+
+      if (!imageUrl){
+        return messageManager.uploadFileFailed("learningpath", res);
+      }
+      const learningPathData = {
+        name: req.body.name.trim(),
+        description: req.body.description?.trim() || null,
+        difficulty_level: req.body.difficulty_level,
+        image: imageUrl,
+        is_active: 1,
+      };
+
+      const learningPath = await repository.create(learningPathData);
+      
+      return messageManager.createSuccess('learningpath', learningPath, res);
+    } catch (error) {
+      console.log(error)
+      throw error;
+    }
+    
+  } catch (error) {
+    return messageManager.createFailed("learningpath", res, error.message);
+  }
+}
+
 module.exports = {
   getAllLearningPaths,
-  toggleStatus
+  toggleStatus,
+  createLearningPath
 };
