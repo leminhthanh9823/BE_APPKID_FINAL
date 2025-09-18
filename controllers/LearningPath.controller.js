@@ -23,24 +23,30 @@ const sanitizeLearningPathData = (data) => {
 
   // Handle difficulty_level
   if (sanitized.difficulty_level !== undefined) {
-    const difficultyValue = parseInt(sanitized.difficulty_level);
+    let diffRaw = sanitized.difficulty_level;
+    // If it's an object from select components like { value, label }
+    if (typeof diffRaw === 'object' && diffRaw !== null) {
+      diffRaw = diffRaw.value ?? diffRaw.id ?? diffRaw.label ?? String(diffRaw);
+    }
+    const difficultyValue = parseInt(diffRaw, 10);
     sanitized.difficulty_level = isNaN(difficultyValue) ? 1 : Math.max(1, Math.min(5, difficultyValue));
   }
 
   // Handle is_active
   if (sanitized.is_active !== undefined) {
-    let activeValue = sanitized.is_active;
-    if (typeof activeValue === "object" && activeValue !== null) {
-      activeValue = activeValue.value || activeValue.id || String(activeValue);
+    let activeRaw = sanitized.is_active;
+    if (typeof activeRaw === 'object' && activeRaw !== null) {
+      activeRaw = activeRaw.value ?? activeRaw.id ?? String(activeRaw);
     }
-
-    if (typeof activeValue === "boolean") {
-      sanitized.is_active = activeValue ? 1 : 0;
-    } else if (typeof activeValue === "string") {
-      const lowerActive = activeValue.toLowerCase();
-      sanitized.is_active = lowerActive === "true" || lowerActive === "1" ? 1 : 0;
-    } else if (typeof activeValue === "number") {
-      sanitized.is_active = activeValue ? 1 : 0;
+    // normalize to number 0/1
+    const activeNum = parseInt(activeRaw, 10);
+    if (!isNaN(activeNum)) {
+      sanitized.is_active = activeNum ? 1 : 0;
+    } else if (typeof activeRaw === 'string') {
+      const lower = activeRaw.toLowerCase();
+      sanitized.is_active = (lower === 'true' || lower === '1') ? 1 : 0;
+    } else if (typeof activeRaw === 'boolean') {
+      sanitized.is_active = activeRaw ? 1 : 0;
     } else {
       sanitized.is_active = 1;
     }
@@ -50,8 +56,8 @@ const sanitizeLearningPathData = (data) => {
 };
 
 const validateLearningPathData = (data, isUpdate = false) => {
-  // Name validations
-  if (!data.name || data.name.trim() === "") {
+  // Name validations - for update, only validate if name is provided
+  if (!isUpdate && (!data.name || data.name.trim() === "")) {
     return "Learning path name is required"; 
   }
 
@@ -68,7 +74,6 @@ const validateLearningPathData = (data, isUpdate = false) => {
   if (!isUpdate && (data.difficulty_level === undefined || data.difficulty_level === null || data.difficulty_level === "")) {
     return "Difficulty level is required"; 
   }
-
   return null;
 };
 
@@ -208,8 +213,76 @@ async function createLearningPath(req, res) {
   }
 }
 
+async function updateLearningPath(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return messageManager.notFound("learningpath", res);
+    }
+
+    // Check if learning path exists
+    const existingPath = await repository.findById(id);
+    if (!existingPath) {
+      return messageManager.notFound('learningpath', res, 'Learning path not found');
+    }
+
+    // Sanitize incoming body to handle objects like { value, label }
+    const sanitizedData = sanitizeLearningPathData(req.body || {});
+
+    // Validate sanitized data (update mode)
+    const validationErrors = validateLearningPathData(sanitizedData, true);
+    if (validationErrors) {
+      return messageManager.validationFailed('learningpath', res, validationErrors);
+    }
+
+    // Validate image file if provided (optional for update)
+    if (req.files?.image) {
+      const imageValidationError = validateImageFile(req.files);
+      if (imageValidationError) {
+        return messageManager.validationFailed('learningpath', res, imageValidationError);
+      }
+    }
+
+    // Check name uniqueness (excluding current record)
+    const existingPathWithName = await repository.findByName(sanitizedData.name);
+    if (existingPathWithName && existingPathWithName.id !== existingPath.id) {
+      return messageManager.validationFailed('learningpath', res, 'Learning path name must be unique');
+    }
+
+    // Handle image upload - keep existing if no new image provided
+    const imageUrl = req.files?.image
+      ? await uploadToMinIO(req.files.image[0], "learning-paths")
+      : (sanitizedData.image || existingPath.image);
+
+    if (req.files?.image && !imageUrl) {
+      return messageManager.uploadFileFailed("learningpath", res);
+    }
+
+    // Prepare update data using sanitized values
+    const updateData = {
+      name: sanitizedData.name?.trim() || existingPath.name,
+      description: sanitizedData.description !== undefined ? (sanitizedData.description?.trim() || null) : existingPath.description,
+      difficulty_level: sanitizedData.difficulty_level !== undefined ? sanitizedData.difficulty_level : existingPath.difficulty_level,
+      is_active: sanitizedData.is_active !== undefined ? sanitizedData.is_active : existingPath.is_active,
+      image: imageUrl
+    };
+
+    // Update learning path
+    const updatedPath = await repository.update(id, updateData);
+    if (!updatedPath) {
+      return messageManager.updateFailed('learningpath', res);
+    }
+
+    return messageManager.updateSuccess('learningpath', updatedPath, res);
+  } catch (error) {
+    return messageManager.updateFailed("learningpath", res, error.message);
+  }
+}
+
 module.exports = {
   getAllLearningPaths,
   toggleStatus,
-  createLearningPath
+  createLearningPath,
+  updateLearningPath
 };
