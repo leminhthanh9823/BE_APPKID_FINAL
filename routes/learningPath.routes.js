@@ -11,7 +11,7 @@ const { teacherOnly } = require("../middlewares/Role.middleware.js");
  * Nghiệp vụ 1: Quản lý danh sách lộ trình (Teacher)
  */
 // POST /cms/learning-paths - Lấy danh sách lộ trình với search/filter/sort/pagination
-router.post("/cms/list", 
+router.post("/cms/all", 
   // jwtMiddleware, 
   // teacherOnly,
   learningPathController.getAllLearningPaths
@@ -19,7 +19,7 @@ router.post("/cms/list",
 
 // PUT /cms/learning-paths/:id/update-status - Cập nhật trạng thái active/inactive
 router.put(
-  "/cms/:id/update-status",
+  "/:id/update-status",
   learningPathController.toggleStatus
 );
 

@@ -9,10 +9,9 @@ class LearningPathRepository {
     if (searchTerm && searchTerm.trim()) {
       whereClause.name = { [Op.like]: `%${searchTerm.trim()}%` };
     }
-    
     // Filter by active status
     if (isActive !== null && isActive !== undefined) {
-      whereClause.is_active = parseInt(isActive);
+      whereClause.is_active = isActive;
     }
     
     // Filter by difficulty level
