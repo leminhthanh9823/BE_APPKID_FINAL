@@ -92,7 +92,6 @@ async function getAllLearningPaths(req, res) {
       is_active = null,
       difficulty_level = null,
     } = req.body || {};
-
     // Input validation
     const page = parseInt(pageNumb);
     const limit = parseInt(pageSize);
@@ -110,14 +109,6 @@ async function getAllLearningPaths(req, res) {
       const diffLevel = parseInt(difficulty_level);
       if (isNaN(diffLevel) || diffLevel < 1 || diffLevel > 5) {
         return messageManager.validationFailed("learningpath", res, "Difficulty level must be between 1 and 5");
-      }
-    }
-
-    // Validate is_active filter
-    if (is_active !== null && is_active !== undefined) {
-      const activeStatus = parseInt(is_active);
-      if (isNaN(activeStatus) || (activeStatus !== 0 && activeStatus !== 1)) {
-        return messageManager.validationFailed("learningpath", res, "Active status must be 0 or 1");
       }
     }
 
