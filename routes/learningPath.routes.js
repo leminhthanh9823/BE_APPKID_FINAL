@@ -21,16 +21,22 @@ router.post("/cms/all",
   learningPathController.getAllLearningPaths
 );
 
-// PUT /cms/learning-paths/:id/update-status - Cập nhật trạng thái active/inactive
+// POST /create - Tạo mới learning path với image upload
+router.post("/create", 
+  learningPathUpload,
+  learningPathController.createLearningPath
+);
+
+// PUT /:id/update-status - Cập nhật trạng thái active/inactive (specific route first)
 router.put(
   "/:id/update-status",
   learningPathController.toggleStatus
 );
 
-// POST /create - Tạo mới learning path với image upload
-router.post("/create", 
+// PUT /:id - Cập nhật learning path với image upload tùy chọn (general route after)
+router.put("/edit/:id", 
   learningPathUpload,
-  learningPathController.createLearningPath
+  learningPathController.updateLearningPath
 );
 
 module.exports = router;

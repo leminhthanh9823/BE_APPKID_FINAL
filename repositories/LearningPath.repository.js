@@ -107,12 +107,33 @@ class LearningPathRepository {
     });
   }
 
+  async findById(id) {
+    return await db.LearningPath.findByPk(id);
+  }
+
   async create(learningPathData, transaction = null) {
     const options = {};
     if (transaction) options.transaction = transaction;
     return await db.LearningPath.create(learningPathData, options);
   }
 
+  async update(id, learningPathData, transaction = null) {
+    const options = {};
+    if (transaction) options.transaction = transaction;
+    
+    const [updatedRowsCount] = await db.LearningPath.update(
+      learningPathData, 
+      { 
+        where: { id },
+        ...options
+      }
+    );
+    
+    if (updatedRowsCount > 0) {
+      return await this.findById(id);
+    }
+    return null;
+  }
 }
 
 module.exports = new LearningPathRepository();
