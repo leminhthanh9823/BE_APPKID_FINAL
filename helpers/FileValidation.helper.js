@@ -93,9 +93,9 @@ const validateEBookCategoryFiles = (files) => {
   return null;
 };
 
-const validateReadingCategoryFiles = (files) => {
+const validateImageFile = (files) => {
   if (files?.image && files.image[0]) {
-    const imageTypeError = validateFileType(files.image[0], ["image"], "Image");
+    const imageTypeError = validateFileType(files.image[0], ["JPG", "JPEG", "PNG", "GIF", "WebP"], "Image");
     if (imageTypeError) return imageTypeError;
     const imageSizeError = validateFileSize(files.image[0], 5, "Image");
     if (imageSizeError) return imageSizeError;
@@ -130,6 +130,6 @@ module.exports = {
   validateFileSize,
   validateEBookFiles,
   validateEBookCategoryFiles,
-  validateReadingCategoryFiles,
+  validateImageFile,
   validateKidReadingFiles,
 };
