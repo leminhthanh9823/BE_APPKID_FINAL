@@ -69,12 +69,6 @@ const validateLearningPathData = (data, isUpdate = false) => {
     return "Difficulty level is required"; 
   }
 
-  if (data.difficulty_level !== undefined && data.difficulty_level !== null) {
-    const diff = parseInt(data.difficulty_level);
-    if (isNaN(diff) || diff < 1 || diff > 5) {
-      return "Difficulty level must be between 1 and 5";
-    }
-  }
   return null;
 };
 
