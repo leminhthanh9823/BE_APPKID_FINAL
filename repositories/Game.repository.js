@@ -2,68 +2,171 @@ const { Game, GameWord, Word, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 class GameRepository {
-  
-  async createGame(gameData, wordIds = []) {
+  async findGameByNameAndReadingId(name, readingId) {
+    return await Game.findOne({
+      where: {
+        name: sequelize.where(
+          sequelize.fn('LOWER', sequelize.col('name')),
+          sequelize.fn('LOWER', name)
+        ),
+        prerequisite_reading_id: readingId
+      }
+    });
+  }
+
+  async getMaxSequenceOrder(readingId) {
+    const result = await Game.findOne({
+      where: { prerequisite_reading_id: readingId },
+      attributes: [[sequelize.fn('MAX', sequelize.col('sequence_order')), 'maxOrder']],
+      raw: true
+    });
+    return result.maxOrder || 0;
+  }
+
+  async createGame(gameData, readingId, transaction) {
+    const maxOrder = await this.getMaxSequenceOrder(readingId);
+    const sequenceOrder = maxOrder + 1;
+
+    const game = await Game.create({
+      ...gameData,
+      prerequisite_reading_id: readingId,
+      sequence_order: sequenceOrder,
+      is_active: false
+    }, { transaction });
+
+    const createdGame = await Game.findByPk(game.id, {
+      include: [{
+        model: sequelize.models.Reading,
+        as: 'prerequisiteReading',
+        attributes: ['id', 'name']
+      }],
+      transaction
+    });
+
+    return createdGame;
+  }
+
+  async getGameById(id) {
+    return await Game.findByPk(id, {
+      include: [{
+        model: sequelize.models.Reading,
+        as: 'prerequisiteReading',
+        attributes: ['id', 'name']
+      }]
+    });
+  }
+
+  async updateGame(id, updateData, transaction) {
+    const game = await Game.findByPk(id);
+    if (!game) return null;
+
+    await game.update(updateData, { transaction });
+    
+    return await this.getGameById(id);
+  }
+
+  async hasStudentRecords(id) {
+    const game = await Game.findByPk(id);
+    if (!game) return false;
+
+    const studentCount = await sequelize.models.StudentReading.count({
+      where: {
+        reading_id: game.prerequisite_reading_id,
+        game_id: id,
+        status: 'completed'
+      }
+    });
+
+    return studentCount > 0;
+  }
+
+  async deleteGame(id) {
     const transaction = await sequelize.transaction();
     
     try {
-      const maxSequenceOrder = await Game.max('sequence_order', { transaction });
-      const nextSequenceOrder = (maxSequenceOrder || 0) + 1;
-      
-      const game = await Game.create({
-        ...gameData,
-        sequence_order: nextSequenceOrder,
-        is_active: 0
-      }, { transaction });
-
-      if (wordIds && wordIds.length > 0) {
-        const gameWords = wordIds.map((wordId, index) => ({
-          game_id: game.id,
-          word_id: wordId,
-          sequence_order: index + 1
-        }));
-        
-        await GameWord.bulkCreate(gameWords, { transaction });
+      const game = await Game.findByPk(id, { transaction });
+      if (!game) {
+        await transaction.rollback();
+        return null;
       }
 
+      const hasRecords = await sequelize.models.StudentReading.count({
+        where: {
+          reading_id: game.prerequisite_reading_id,
+          game_id: id,
+          status: 'completed'
+        },
+        transaction
+      });
+
+      if (hasRecords > 0) {
+        await game.update({ is_active: false }, { transaction });
+        await transaction.commit();
+        return {
+          game,
+          deactivated: true,
+          message: "Game was deactivated due to existing student records"
+        };
+      }
+
+      await GameWord.destroy({
+        where: { game_id: id },
+        transaction
+      });
+
+      await game.destroy({ transaction });
       await transaction.commit();
       
-      return await this.getGameById(game.id);
+      return {
+        game,
+        deactivated: false,
+        message: "Game was successfully deleted"
+      };
     } catch (error) {
       await transaction.rollback();
       throw error;
     }
   }
 
-  async getGames(options = {}) {
+  async toggleGameStatus(id) {
+    const game = await Game.findByPk(id);
+    if (!game) return null;
+
+    const newStatus = !game.is_active;
+    await game.update({ is_active: newStatus });
+    
+    return game;
+  }
+
+  async listGames(readingId, options = {}) {
     const {
       page = 1,
       limit = 10,
       searchTerm = '',
       status = null,
       type = null,
-      sortBy = 'created_at',
-      sortOrder = 'DESC'
+      sortBy = 'sequence_order',
+      sortOrder = 'ASC'
     } = options;
 
-    const offset = (page - 1) * limit;
-    
-    const whereConditions = {};
-    
+    const whereConditions = {
+      prerequisite_reading_id: readingId
+    };
+
     if (searchTerm) {
       whereConditions[Op.or] = [
         { name: { [Op.like]: `%${searchTerm}%` } },
         { description: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
-    
+
     if (status === 'active') {
-      whereConditions.is_active = 1;
+      whereConditions.is_active = true;
     } else if (status === 'inactive') {
-      whereConditions.is_active = 0;
+      whereConditions.is_active = false;
     }
-    
-    if (type !== null) {
+
+    if (type !== null && type !== undefined) {
       whereConditions.type = type;
     }
 
@@ -71,21 +174,35 @@ class GameRepository {
       where: whereConditions,
       include: [
         {
+          model: sequelize.models.Reading,
+          as: 'prerequisiteReading',
+          attributes: ['id', 'name']
+        },
+        {
           model: GameWord,
           as: 'gameWords',
-          include: [
-            {
-              model: Word,
-              as: 'word',
-              attributes: ['id', 'word', 'level', 'type']
-            }
-          ]
+          attributes: [[sequelize.fn('COUNT', sequelize.col('gameWords.id')), 'wordCount']],
+          required: false
         }
       ],
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(DISTINCT sr.student_id)
+              FROM student_readings sr
+              WHERE sr.reading_id = Game.prerequisite_reading_id
+              AND sr.status = 'completed'
+            )`),
+            'studentCompletionCount'
+          ]
+        ]
+      },
       order: [[sortBy, sortOrder.toUpperCase()]],
       limit: parseInt(limit),
-      offset: parseInt(offset),
-      distinct: true
+      offset: (page - 1) * parseInt(limit),
+      distinct: true,
+      group: ['Game.id']
     });
 
     return {
@@ -94,112 +211,9 @@ class GameRepository {
         total: count,
         totalPages: Math.ceil(count / limit),
         currentPage: parseInt(page),
-        limit: parseInt(limit),
-        hasNext: page < Math.ceil(count / limit),
-        hasPrev: page > 1
+        limit: parseInt(limit)
       }
     };
-  }
-
-  async getGameById(id) {
-    const game = await Game.findByPk(id, {
-      include: [
-        {
-          model: GameWord,
-          as: 'gameWords',
-          include: [
-            {
-              model: Word,
-              as: 'word',
-              attributes: ['id', 'word', 'image', 'level', 'type', 'note']
-            }
-          ],
-          order: [['sequence_order', 'ASC']]
-        }
-      ]
-    });
-
-    return game;
-  }
-
-  async updateGame(id, updateData, wordIds = null) {
-    const transaction = await sequelize.transaction();
-    
-    try {
-      const existingGame = await Game.findByPk(id, { transaction });
-      if (!existingGame) {
-        await transaction.rollback();
-        return null;
-      }
-
-      await existingGame.update(updateData, { transaction });
-
-      if (Array.isArray(wordIds)) {
-        await GameWord.destroy({
-          where: { game_id: id },
-          transaction
-        });
-
-        if (wordIds.length > 0) {
-          const gameWords = wordIds.map((wordId, index) => ({
-            game_id: id,
-            word_id: wordId,
-            sequence_order: index + 1
-          }));
-          
-          await GameWord.bulkCreate(gameWords, { transaction });
-        }
-      }
-
-      await transaction.commit();
-      
-      return await this.getGameById(id);
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
-  }
-
-  async deleteGame(id) {
-    const game = await Game.findByPk(id);
-    if (!game) {
-      return null;
-    }
-
-    await game.update({ is_active: 0 });
-    
-    return game;
-  }
-
-  async getGamesByType(type) {
-    return await Game.findAll({
-      where: { type, is_active: 1 },
-      include: [
-        {
-          model: GameWord,
-          as: 'gameWords',
-          include: [
-            {
-              model: Word,
-              as: 'word'
-            }
-          ]
-        }
-      ],
-      order: [['sequence_order', 'ASC']]
-    });
-  }
-
-  async toggleStatus(id) {
-    const game = await Game.findByPk(id);
-    if (!game) {
-      return null;
-    }
-
-    const newStatus = game.is_active === 1 ? 0 : 1;
-    await game.update({ is_active: newStatus });
-    
-    return game;
   }
 }
 

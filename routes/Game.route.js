@@ -2,48 +2,35 @@ const express = require("express");
 const router = express.Router();
 const gameController = require("../controllers/Game.controller.js");
 const authMiddleware = require("../middlewares/Auth.middleware.js");
-const { adminOnly } = require("../middlewares/Role.middleware.js");
+const { teacherOnly } = require("../middlewares/Role.middleware.js");
+const upload = require("../middlewares/File.middleware");
 
-router.post("/", 
-  authMiddleware, 
-  adminOnly, 
+router.use(authMiddleware);
+
+router.post('/admin/readings/:readingId/games',
+  teacherOnly,
+  upload.fields([{ name: 'image', maxCount: 1 }]),
   gameController.create
 );
 
-router.get("/", 
-  authMiddleware, 
-  adminOnly, 
+router.get('/admin/readings/:readingId/games',
+  teacherOnly,
   gameController.list
 );
 
-router.get("/:id", 
-  authMiddleware, 
-  adminOnly, 
-  gameController.detail
-);
-
-router.put("/:id", 
-  authMiddleware, 
-  adminOnly, 
+router.put('/admin/games/:id',
+  teacherOnly,
+  upload.fields([{ name: 'image', maxCount: 1 }]),
   gameController.update
 );
 
-router.delete("/:id", 
-  authMiddleware, 
-  adminOnly, 
+router.delete('/admin/games/:id',
+  teacherOnly,
   gameController.delete
 );
 
-router.patch("/:id/toggle-status", 
-  authMiddleware, 
-  adminOnly, 
-  gameController.toggleStatus
-);
-
-router.get("/type/:type", 
-  authMiddleware, 
-  adminOnly, 
-  gameController.getByType
+router.get('/readings/:readingId/games',
+  gameController.list
 );
 
 module.exports = router;

@@ -23,7 +23,9 @@ const validateWordAssignment = [
 router.post('/', 
   auth.verifyToken,
   auth.isTeacher,
-  uploadFile.single('image'),
+  uploadFile.fields([
+    { name: 'image', maxCount: 1 }
+  ]),
   validateWord,
   WordController.createWord
 );
@@ -31,7 +33,9 @@ router.post('/',
 router.put('/:id',
   auth.verifyToken,
   auth.isTeacher,
-  uploadFile.single('image'),
+  uploadFile.fields([
+    { name: 'image', maxCount: 1 }
+  ]),
   validateWord,
   WordController.updateWord
 );

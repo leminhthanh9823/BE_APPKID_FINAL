@@ -1,22 +1,26 @@
-const { Word, GameWord, sequelize } = require('../models');
+const { Word, GameWord, Game, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
 
 class WordRepository {
-  
-  async createWord(wordData, imageFile) {
+  async findByWordText(wordText) {
+    return await Word.findOne({
+      where: {
+        word: sequelize.where(
+          sequelize.fn('LOWER', sequelize.col('word')),
+          sequelize.fn('LOWER', wordText.trim())
+        )
+      }
+    });
+  }
+
+  async createWord(wordData) {
     const transaction = await sequelize.transaction();
     
     try {
-      const imageUrl = await uploadToMinIO(imageFile, "words");
-      if (!imageUrl) {
-        throw new Error("Failed to upload image to MinIO");
-      }
-
       const word = await Word.create({
         ...wordData,
-        image: imageUrl,
-        is_active: wordData.is_active !== undefined ? wordData.is_active : 1
+        is_active: wordData.is_active !== undefined ? wordData.is_active : true
       }, { transaction });
 
       await transaction.commit();
@@ -27,61 +31,136 @@ class WordRepository {
     }
   }
 
-  async getWords(options = {}) {
+  async updateWord(id, updateData) {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      const word = await Word.findByPk(id, { transaction });
+      if (!word) {
+        await transaction.rollback();
+        return null;
+      }
+
+      await word.update(updateData, { transaction });
+      await transaction.commit();
+      
+      return await Word.findByPk(id, {
+        include: [{
+          model: Game,
+          through: GameWord,
+          as: 'games'
+        }]
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async deleteWord(id) {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      const word = await Word.findByPk(id, { 
+        include: [{
+          model: Game,
+          through: GameWord,
+          as: 'games'
+        }],
+        transaction 
+      });
+
+      if (!word) {
+        await transaction.rollback();
+        return null;
+      }
+
+      if (word.games && word.games.length > 0) {
+        await word.update({ is_active: false }, { transaction });
+        await transaction.commit();
+        return { 
+          deactivated: true,
+          message: "Word was deactivated because it's used in games"
+        };
+      }
+
+      await word.destroy({ transaction });
+      await transaction.commit();
+      
+      return {
+        deactivated: false,
+        message: "Word was successfully deleted"
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async getWordById(id) {
+    return await Word.findByPk(id, {
+      include: [{
+        model: Game,
+        through: GameWord,
+        as: 'games',
+        include: [{
+          model: GameWord,
+          as: 'gameWords',
+          attributes: ['sequence_order']
+        }]
+      }]
+    });
+  }
+
+  async listWords(options = {}) {
     const {
       page = 1,
       limit = 10,
-      searchTerm = '',
-      status = null,
+      search = '',
       level = null,
       type = null,
+      isActive = null,
       sortBy = 'word',
       sortOrder = 'ASC'
     } = options;
 
-    const offset = (page - 1) * limit;
-    
     const whereConditions = {};
-    
-    if (searchTerm) {
+
+    if (search) {
       whereConditions[Op.or] = [
-        { word: { [Op.like]: `%${searchTerm}%` } },
-        { note: { [Op.like]: `%${searchTerm}%` } }
+        { word: { [Op.like]: `%${search}%` } },
+        { definition: { [Op.like]: `%${search}%` } },
+        { note: { [Op.like]: `%${search}%` } }
       ];
     }
-    
-    if (status === 'active') {
-      whereConditions.is_active = 1;
-    } else if (status === 'inactive') {
-      whereConditions.is_active = 0;
-    }
-    
+
     if (level !== null) {
       whereConditions.level = level;
     }
-    
+
     if (type !== null) {
       whereConditions.type = type;
     }
 
+    if (isActive !== null) {
+      whereConditions.is_active = isActive;
+    }
+
+    const allowedSortFields = ['word', 'level', 'type', 'created_at'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'word';
+
     const { rows: words, count } = await Word.findAndCountAll({
       where: whereConditions,
-      include: [
-        {
-          model: GameWord,
-          as: 'gameWords',
-          include: [
-            {
-              model: require('../models').Game,
-              as: 'game',
-              attributes: ['id', 'name', 'type']
-            }
-          ]
-        }
-      ],
-      order: [[sortBy, sortOrder.toUpperCase()]],
+      include: [{
+        model: Game,
+        through: GameWord,
+        as: 'games',
+        attributes: ['id', 'name'],
+        through: { attributes: [] }
+      }],
+      order: [[sortField, sortOrder.toUpperCase()]],
       limit: parseInt(limit),
-      offset: parseInt(offset),
+      offset: (page - 1) * parseInt(limit),
       distinct: true
     });
 
@@ -91,130 +170,134 @@ class WordRepository {
         total: count,
         totalPages: Math.ceil(count / limit),
         currentPage: parseInt(page),
-        limit: parseInt(limit),
-        hasNext: page < Math.ceil(count / limit),
-        hasPrev: page > 1
+        limit: parseInt(limit)
       }
     };
   }
 
-  async getWordById(id) {
-    const word = await Word.findByPk(id, {
-      include: [
-        {
-          model: GameWord,
-          as: 'gameWords',
-          include: [
-            {
-              model: require('../models').Game,
-              as: 'game',
-              attributes: ['id', 'name', 'type', 'description']
-            }
-          ]
-        }
-      ]
-    });
-
-    return word;
-  }
-
-  async findByWordText(wordText) {
-    return await Word.findOne({
-      where: { word: wordText.trim() }
-    });
-  }
-
-  async updateWord(id, updateData, imageFile = null) {
+  async assignWordsToGame(gameId, wordAssignments) {
     const transaction = await sequelize.transaction();
     
     try {
-      const existingWord = await Word.findByPk(id, { transaction });
-      if (!existingWord) {
-        await transaction.rollback();
-        return null;
+      const game = await Game.findByPk(gameId, { transaction });
+      if (!game) {
+        throw new Error('Game not found');
       }
 
-      let finalUpdateData = { ...updateData };
+      // Validate all words exist and are active
+      const wordIds = wordAssignments.map(wa => wa.wordId);
+      const words = await Word.findAll({
+        where: {
+          id: wordIds,
+          is_active: true
+        },
+        transaction
+      });
 
-      if (imageFile) {
-        const newImageUrl = await uploadToMinIO(imageFile, "words");
-        if (!newImageUrl) {
-          throw new Error("Failed to upload new image to MinIO");
-        }
-        
-        finalUpdateData.image = newImageUrl;
-        
+      if (words.length !== wordIds.length) {
+        throw new Error('Some words were not found or are inactive');
       }
 
-      await existingWord.update(finalUpdateData, { transaction });
+      // Remove existing assignments for this game
+      await GameWord.destroy({
+        where: { game_id: gameId },
+        transaction
+      });
 
+      // Create new assignments
+      const assignments = wordAssignments.map(wa => ({
+        game_id: gameId,
+        word_id: wa.wordId,
+        sequence_order: wa.sequenceOrder
+      }));
+
+      await GameWord.bulkCreate(assignments, { transaction });
       await transaction.commit();
-      
-      return await this.getWordById(id);
+
+      return await Game.findByPk(gameId, {
+        include: [{
+          model: Word,
+          through: GameWord,
+          as: 'words',
+          attributes: ['id', 'word', 'definition', 'image', 'level', 'type'],
+          include: [{
+            model: GameWord,
+            as: 'gameWords',
+            attributes: ['sequence_order']
+          }]
+        }],
+        transaction: null
+      });
     } catch (error) {
       await transaction.rollback();
       throw error;
     }
   }
 
-  async deleteWord(id) {
-    const word = await Word.findByPk(id);
-    if (!word) {
-      return null;
-    }
-
-    await word.update({ is_active: 0 });
+  async bulkImportWords(words) {
+    const transaction = await sequelize.transaction();
     
-    return word;
-  }
+    try {
+      const results = {
+        imported: 0,
+        skipped: 0,
+        failed: 0,
+        errors: []
+      };
 
-  async hasStudentProgress(wordId) {
-    // Check if word is used in any games that have student progress
-    return false;
-  }
+      for (const wordData of words) {
+        try {
+          // Check for existing word
+          const existingWord = await this.findByWordText(wordData.word);
+          if (existingWord) {
+            results.skipped++;
+            continue;
+          }
 
-  async getWordsByLevel(level) {
-    return await Word.findAll({
-      where: { level, is_active: 1 },
-      order: [['word', 'ASC']]
-    });
-  }
+          // Create new word
+          await Word.create({
+            ...wordData,
+            is_active: true
+          }, { transaction });
+          
+          results.imported++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            word: wordData.word,
+            error: error.message
+          });
+        }
+      }
 
-  async getWordsByType(type) {
-    return await Word.findAll({
-      where: { type, is_active: 1 },
-      order: [['word', 'ASC']]
-    });
-  }
-
-  async toggleStatus(id) {
-    const word = await Word.findByPk(id);
-    if (!word) {
-      return null;
+      await transaction.commit();
+      return results;
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
+  }
 
-    const newStatus = word.is_active === 1 ? 0 : 1;
-    await word.update({ is_active: newStatus });
+  async removeWordsFromGame(gameId) {
+    const transaction = await sequelize.transaction();
     
-    return word;
-  }
+    try {
+      const game = await Game.findByPk(gameId, { transaction });
+      if (!game) {
+        throw new Error('Game not found');
+      }
 
-  async getActiveWords() {
-    return await Word.findAll({
-      where: { is_active: 1 },
-      attributes: ['id', 'word', 'level', 'type'],
-      order: [['word', 'ASC']]
-    });
-  }
+      const result = await GameWord.destroy({
+        where: { game_id: gameId },
+        transaction
+      });
 
-  async getWordsByIds(wordIds) {
-    return await Word.findAll({
-      where: { 
-        id: { [Op.in]: wordIds },
-        is_active: 1
-      },
-      order: [['word', 'ASC']]
-    });
+      await transaction.commit();
+      return result;
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   }
 }
 

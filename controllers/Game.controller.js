@@ -1,3 +1,4 @@
+const { sequelize } = require('../models');
 const gameRepository = require('../repositories/Game.repository');
 const messageManager = require('../helpers/MessageManager.helper');
 
@@ -57,55 +58,38 @@ const sanitizeGameData = (data) => {
 };
 
 class GameController {
-
-  async create(req, res) {
-    try {
-      const { name, type, description, words = [] } = req.body;
-      
-      const validationError = validateGameData({ name, type, description });
-      if (validationError) {
-        return messageManager.validationFailed('game', res, validationError);
-      }
-
-      const gameData = sanitizeGameData({ name, type, description });
-
-      let wordIds = [];
-      if (words && Array.isArray(words)) {
-        wordIds = words.map(wordId => parseInt(wordId)).filter(id => !isNaN(id));
-      }
-
-      const game = await gameRepository.createGame(gameData, wordIds);
-
-      return messageManager.createSuccess('game', game, res);
-    } catch (error) {
-      console.error('Create game error:', error);
-      return messageManager.createFailed('game', res, error.message);
-    }
-  }
-
   async list(req, res) {
     try {
+      const { readingId } = req.params;
       const {
         page = 1,
         limit = 10,
-        searchTerm = '',
+        search = '',
         status = null,
         type = null,
-        sortBy = 'created_at',
-        sortOrder = 'DESC'
+        sortBy = 'sequence_order',
+        sortOrder = 'ASC'
       } = req.query;
 
-      const options = {
+      const reading = await sequelize.models.Reading.findByPk(readingId);
+      if (!reading) {
+        return messageManager.notFound('reading', res);
+      }
+
+      const allowedSortFields = ['sequence_order', 'name', 'type', 'created_at'];
+      if (!allowedSortFields.includes(sortBy)) {
+        return messageManager.validationFailed('game', res, 'Invalid sort field');
+      }
+
+      const result = await gameRepository.listGames(readingId, {
         page: parseInt(page),
         limit: parseInt(limit),
-        searchTerm: searchTerm.toString().trim(),
+        searchTerm: search.toString().trim(),
         status,
-        type: type ? parseInt(type) : null,
+        type: type !== null ? parseInt(type) : null,
         sortBy,
-        sortOrder
-      };
-
-      const result = await gameRepository.getGames(options);
+        sortOrder: ['ASC', 'DESC'].includes(sortOrder.toUpperCase()) ? sortOrder : 'ASC'
+      });
 
       return messageManager.fetchSuccess('game', result, res);
     } catch (error) {
@@ -114,89 +98,23 @@ class GameController {
     }
   }
 
-  async detail(req, res) {
-    try {
-      const { id } = req.params;
-
-      // Validate ID
-      if (!id || isNaN(parseInt(id))) {
-        return messageManager.notFound('game', res);
-      }
-
-      const game = await gameRepository.getGameById(parseInt(id));
-      
-      if (!game) {
-        return messageManager.notFound('game', res);
-      }
-
-      return messageManager.fetchSuccess('game', game, res);
-    } catch (error) {
-      console.error('Game detail error:', error);
-      return messageManager.fetchFailed('game', res, error.message);
-    }
-  }
-
-  async update(req, res) {
-    try {
-      const { id } = req.params;
-      const { name, type, description, words, is_active } = req.body;
-
-      if (!id || isNaN(parseInt(id))) {
-        return messageManager.notFound('game', res);
-      }
-
-      const validationError = validateGameData({ name, type, description }, true);
-      if (validationError) {
-        return messageManager.validationFailed('game', res, validationError);
-      }
-
-      const updateData = sanitizeGameData({ name, type, description, is_active });
-      
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined) {
-          delete updateData[key];
-        }
-      });
-
-      let wordIds = null;
-      if (words !== undefined && Array.isArray(words)) {
-        wordIds = words.map(wordId => parseInt(wordId)).filter(id => !isNaN(id));
-      }
-
-      const game = await gameRepository.updateGame(parseInt(id), updateData, wordIds);
-      
-      if (!game) {
-        return messageManager.notFound('game', res);
-      }
-
-      return messageManager.updateSuccess('game', game, res);
-    } catch (error) {
-      console.error('Update game error:', error);
-      return messageManager.updateFailed('game', res, error.message);
-    }
-  }
-
   async delete(req, res) {
     try {
       const { id } = req.params;
 
-      if (!id || isNaN(parseInt(id))) {
-        return messageManager.notFound('game', res);
-      }
-
-      const gameId = parseInt(id);
-
-      const existingGame = await gameRepository.getGameById(gameId);
+      const existingGame = await gameRepository.getGameById(id);
       if (!existingGame) {
         return messageManager.notFound('game', res);
       }
 
-      const hasProgress = await gameRepository.hasStudentProgress(gameId);
-      if (hasProgress) {
-        console.log('Warning: Students have already accessed this game. It will be deactivated but data preserved.'); // MSG28
+      const result = await gameRepository.deleteGame(id);
+      if (!result) {
+        return messageManager.notFound('game', res);
       }
 
-      const deletedGame = await gameRepository.deleteGame(gameId);
+      if (result.deactivated) {
+        return messageManager.deleteSuccess('game', res, result.message);
+      }
 
       return messageManager.deleteSuccess('game', res);
     } catch (error) {
@@ -205,41 +123,99 @@ class GameController {
     }
   }
 
-  async toggleStatus(req, res) {
+  async update(req, res) {
+    const transaction = await sequelize.transaction();
+
     try {
       const { id } = req.params;
+      const { name, description, type, is_active } = req.body;
 
-      if (!id || isNaN(parseInt(id))) {
+      const validationError = validateGameData({ name, description, type }, true);
+      if (validationError) {
+        return messageManager.validationFailed('game', res, validationError);
+      }
+
+      const existingGame = await gameRepository.getGameById(id);
+      if (!existingGame) {
         return messageManager.notFound('game', res);
       }
 
-      const game = await gameRepository.toggleStatus(parseInt(id));
-      
-      if (!game) {
-        return messageManager.notFound('game', res);
+      if (name && name !== existingGame.name) {
+        const duplicateGame = await gameRepository.findGameByNameAndReadingId(
+          name, 
+          existingGame.prerequisite_reading_id
+        );
+        if (duplicateGame && duplicateGame.id !== parseInt(id)) {
+          await transaction.rollback();
+          return messageManager.validationFailed('game', res, 
+            "A game with this name already exists for this reading"
+          );
+        }
       }
 
-      return messageManager.toggleSuccess('game', game, res);
+      const updateData = sanitizeGameData({ 
+        name, description, type, is_active, 
+      });
+
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+
+      const updatedGame = await gameRepository.updateGame(id, updateData, transaction);
+
+      await transaction.commit();
+
+      return messageManager.updateSuccess('game', updatedGame, res);
     } catch (error) {
-      console.error('Toggle game status error:', error);
-      return messageManager.toggleFailed('game', res);
+      await transaction.rollback();
+      console.error('Update game error:', error);
+      return messageManager.updateFailed('game', res, error.message);
     }
   }
 
-  async getByType(req, res) {
-    try {
-      const { type } = req.params;
+  async create(req, res) {
+    const transaction = await sequelize.transaction();
 
-      if (!type || isNaN(parseInt(type))) {
-        return messageManager.validationFailed('game', res, 'Invalid game type');
+    try {
+      const { readingId } = req.params;
+      const { name, description, type } = req.body;
+
+      const validationError = validateGameData({ name, description, type });
+      if (validationError) {
+        return messageManager.validationFailed('game', res, validationError);
       }
 
-      const games = await gameRepository.getGamesByType(parseInt(type));
+      const reading = await sequelize.models.Reading.findByPk(readingId);
+      if (!reading) {
+        await transaction.rollback();
+        return messageManager.notFound('reading', res);
+      }
 
-      return messageManager.fetchSuccess('game', { games }, res);
+      const existingGame = await gameRepository.findGameByNameAndReadingId(name, readingId);
+      if (existingGame) {
+        await transaction.rollback();
+        return messageManager.validationFailed('game', res, 
+          "A game with this name already exists for this reading"
+        );
+      }
+
+      const gameData = sanitizeGameData({ name, description, type });
+
+      const createdGame = await gameRepository.createGame(
+        gameData,
+        readingId,
+        transaction
+      );
+
+      await transaction.commit();
+
+      return messageManager.createSuccess('game', createdGame, res, 201);
     } catch (error) {
-      console.error('Get games by type error:', error);
-      return messageManager.fetchFailed('game', res, error.message);
+      await transaction.rollback();
+      console.error('Create game error:', error);
+      return messageManager.createFailed('game', res, error.message);
     }
   }
 }
