@@ -5,6 +5,7 @@
 const validateFileType = (file, allowedTypes, fieldName) => {
   if (!file) return null;
 
+  // Predefined groups of mime types
   const allowedMimeTypes = {
     image: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"],
     video: [
@@ -19,12 +20,62 @@ const validateFileType = (file, allowedTypes, fieldName) => {
     ],
   };
 
-  const validTypes = allowedTypes.flatMap(
-    (type) => allowedMimeTypes[type] || []
-  );
+  // Friendly names to show to users
+  const friendlyNames = {
+    image: ["JPEG", "JPG", "PNG", "GIF", "WebP"],
+    video: ["MP4", "AVI", "MOV", "WMV", "FLV", "WEBM", "MKV", "QuickTime"]
+  };
+
+  // Build valid mime list from allowedTypes which may include group keys (e.g. 'image')
+  const validTypes = allowedTypes.flatMap((type) => {
+    // normalize type to lower for group match
+    const t = String(type).toLowerCase();
+    if (allowedMimeTypes[t]) return allowedMimeTypes[t];
+    // if not a group, treat type as an extension name (e.g. 'JPG' or 'png')
+    // try to map common extensions to mime types
+    const ext = String(type).toLowerCase();
+    switch (ext) {
+      case 'jpg':
+        return ['image/jpg'];
+      case 'jpeg':
+        return ['image/jpg'];
+      case 'png':
+        return ['image/png'];
+      case 'gif':
+        return ['image/gif'];
+      case 'webp':
+        return ['image/webp'];
+      case 'mp4':
+        return ['video/mp4'];
+      case 'avi':
+        return ['video/avi'];
+      case 'mov':
+        return ['video/mov', 'video/quicktime'];
+      case 'wmv':
+        return ['video/wmv'];
+      case 'flv':
+        return ['video/flv'];
+      case 'webm':
+        return ['video/webm'];
+      case 'mkv':
+        return ['video/mkv'];
+      default:
+        return [];
+    }
+  });
 
   if (!validTypes.includes(file.mimetype)) {
-    return `${fieldName} must be ${allowedTypes.join(" or ")} file`;
+    // Build a friendly list to show the user
+    const friendlyList = allowedTypes.flatMap((type) => {
+      const t = String(type).toLowerCase();
+      if (friendlyNames[t]) return friendlyNames[t];
+      // If the caller passed explicit extensions, normalize and show them as-is
+      return [String(type).toUpperCase()];
+    });
+
+    // Deduplicate
+    const uniqueFriendly = [...new Set(friendlyList)];
+    return `${fieldName} must be one of the following types: ${uniqueFriendly.join(', ')}`;
   }
 
   return null;
@@ -93,7 +144,7 @@ const validateEBookCategoryFiles = (files) => {
   return null;
 };
 
-const validateReadingCategoryFiles = (files) => {
+const validateImageFile = (files) => {
   if (files?.image && files.image[0]) {
     const imageTypeError = validateFileType(files.image[0], ["image"], "Image");
     if (imageTypeError) return imageTypeError;
@@ -130,6 +181,6 @@ module.exports = {
   validateFileSize,
   validateEBookFiles,
   validateEBookCategoryFiles,
-  validateReadingCategoryFiles,
+  validateImageFile,
   validateKidReadingFiles,
 };

@@ -7,6 +7,7 @@ const kidReadingMocks = require("./mocks/kidReadingMocks");
 const readingCategoryMocks = require("./mocks/readingCategoryMocks");
 const kidQuestionMocks = require("./mocks/kidQuestionMocks");
 const feedbackMocks = require("./mocks/feedbackMocks");
+const studentAdviceMocks = require("./mocks/studentAdviceMocks");
 
 const studentReadingMocks = require("./mocks/studentReadingMocks");
 
@@ -35,6 +36,7 @@ kidReadingMocks(app);
 readingCategoryMocks(app);
 kidQuestionMocks(app);
 feedbackMocks(app);
+studentAdviceMocks(app);
 
 studentReadingMocks(app);
 
