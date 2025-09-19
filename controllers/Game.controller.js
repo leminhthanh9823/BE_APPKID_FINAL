@@ -66,9 +66,7 @@ class GameController {
         limit = 10,
         search = '',
         status = null,
-        type = null,
-        sortBy = 'sequence_order',
-        sortOrder = 'ASC'
+        type = null
       } = req.query;
 
       const reading = await sequelize.models.Reading.findByPk(readingId);
@@ -76,19 +74,12 @@ class GameController {
         return messageManager.notFound('reading', res);
       }
 
-      const allowedSortFields = ['sequence_order', 'name', 'type', 'created_at'];
-      if (!allowedSortFields.includes(sortBy)) {
-        return messageManager.validationFailed('game', res, 'Invalid sort field');
-      }
-
       const result = await gameRepository.listGames(readingId, {
         page: parseInt(page),
         limit: parseInt(limit),
         searchTerm: search.toString().trim(),
         status,
-        type: type !== null ? parseInt(type) : null,
-        sortBy,
-        sortOrder: ['ASC', 'DESC'].includes(sortOrder.toUpperCase()) ? sortOrder : 'ASC'
+        type: type !== null ? parseInt(type) : null
       });
 
       return messageManager.fetchSuccess('game', result, res);

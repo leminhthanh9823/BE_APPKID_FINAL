@@ -144,9 +144,7 @@ class GameRepository {
       limit = 10,
       searchTerm = '',
       status = null,
-      type = null,
-      sortBy = 'sequence_order',
-      sortOrder = 'ASC'
+      type = null
     } = options;
 
     const whereConditions = {
@@ -198,7 +196,7 @@ class GameRepository {
           ]
         ]
       },
-      order: [[sortBy, sortOrder.toUpperCase()]],
+      order: [['sequence_order', 'ASC']],
       limit: parseInt(limit),
       offset: (page - 1) * parseInt(limit),
       distinct: true,

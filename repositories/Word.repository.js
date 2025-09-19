@@ -120,8 +120,7 @@ class WordRepository {
       level = null,
       type = null,
       isActive = null,
-      sortBy = 'word',
-      sortOrder = 'ASC'
+      isActive = null
     } = options;
 
     const whereConditions = {};
@@ -146,9 +145,6 @@ class WordRepository {
       whereConditions.is_active = isActive;
     }
 
-    const allowedSortFields = ['word', 'level', 'type', 'created_at'];
-    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'word';
-
     const { rows: words, count } = await Word.findAndCountAll({
       where: whereConditions,
       include: [{
@@ -158,7 +154,7 @@ class WordRepository {
         attributes: ['id', 'name'],
         through: { attributes: [] }
       }],
-      order: [[sortField, sortOrder.toUpperCase()]],
+      order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset: (page - 1) * parseInt(limit),
       distinct: true

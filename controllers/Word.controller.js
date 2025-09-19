@@ -205,9 +205,7 @@ class WordController {
         level: req.query.level !== undefined ? parseInt(req.query.level) : null,
         type: req.query.type !== undefined ? parseInt(req.query.type) : null,
         isActive: req.query.isActive !== undefined ? 
-          (req.query.isActive === 'true' || req.query.isActive === '1') : null,
-        sortBy: req.query.sortBy || 'word',
-        sortOrder: (req.query.sortOrder || 'ASC').toUpperCase()
+          (req.query.isActive === 'true' || req.query.isActive === '1') : null
       };
 
       const result = await wordRepository.listWords(options);
