@@ -213,10 +213,11 @@ async function getAll(req, res) {
         records: transformedRecords,
         total_record,
         total_page,
-      }, res)
+      })
     );
   } catch (error) {
-    res.status(500).json(messageManager.fetchFailed("ebook", res));
+    console.log(error)
+    res.status(500).json(messageManager.fetchFailed("ebook"));
   }
 }
 

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
-  const ELibraryCategory = sequelize.define(
-    "e_library_categories",
+  const EBookCategory = sequelize.define(
+    "EBookCategory",
     {
       id: {
         type: DataTypes.INTEGER,
@@ -45,14 +45,14 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: "updated_at",
     }
   );
-  ELibraryCategory.associate = (models) => {
-    ELibraryCategory.belongsToMany(models.EBook, {
-      through: "EBook_EBookCategory",
+  EBookCategory.associate = (models) => {
+    EBookCategory.belongsToMany(models.EBook, {
+      through: "e_library_categories_relations",
       as: "ebooks",
-      foreignKey: "category_id",
-      otherKey: "ebook_id",
+      foreignKey: "elibrary_categories_id",
+      otherKey: "elibrary_id",
     });
   };
 
-  return ELibraryCategory;
+  return EBookCategory;
 };

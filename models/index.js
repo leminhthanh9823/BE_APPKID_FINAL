@@ -56,6 +56,8 @@ db.Word = require("./Words.model")(sequelize, Sequelize);
 db.GameWord = require("./GameWords.model")(sequelize, Sequelize);
 
 db.User.associate && db.User.associate(db);
+db.EBook.associate && db.EBook.associate(db);
+db.EBookCategory.associate && db.EBookCategory.associate(db);
 db.Feedback.associate && db.Feedback.associate(db);
 db.FeedbackSolve.associate && db.FeedbackSolve.associate(db);
 db.FeedbackCategory.associate && db.FeedbackCategory.associate(db);
