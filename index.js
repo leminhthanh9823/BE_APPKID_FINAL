@@ -25,7 +25,8 @@ const NotifyRoute = require("./routes/Notify.route");
 const FeedbackRoute = require("./routes/Feedback.route");
 const StudentAdviceRoute = require("./routes/StudentAdvice.route");
 const LearningPathRoute = require("./routes/learningPath.routes");
-
+const GameRoute = require("./routes/Game.route");
+const WordRoute = require("./routes/Word.route");
 app.use(express.json({ limit: "400mb" }));
 
 app.use(cors());
@@ -54,6 +55,8 @@ app.use("/api/notify", NotifyRoute);
 app.use("/api/feedback", FeedbackRoute);
 app.use("/api/student-advice", StudentAdviceRoute);
 app.use("/api/learning-path", LearningPathRoute);
+app.use("/api/game", GameRoute);
+app.use("/api/word", WordRoute);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

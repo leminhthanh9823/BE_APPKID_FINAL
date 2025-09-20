@@ -12,24 +12,21 @@ const generateWordTemplate = () => {
   const sampleData = [
     {
       word: '(Required) Example: book',
-      definition: '(Required) Example: a written or printed work consisting of pages',
+      note: '(Required) Example: a written or printed work consisting of pages',
       level: '(Optional) 1-5, Example: 1',
-      type: '(Optional) 1=noun, 2=verb, etc.',
-      note: '(Optional) Additional notes about the word'
+      type: '(Optional) 1=noun, 2=verb, etc.'
     },
     {
       word: 'cat',
-      definition: 'a small domesticated carnivorous mammal',
+      note: 'a small domesticated carnivorous mammal',
       level: '1',
-      type: '1',
-      note: 'Common household pet'
+      type: '1'
     },
     {
       word: 'run',
-      definition: 'move at a speed faster than a walk',
+      note: 'move at a speed faster than a walk',
       level: '2',
-      type: '2',
-      note: 'Action verb'
+      type: '2'
     }
   ];
 
@@ -39,10 +36,9 @@ const generateWordTemplate = () => {
   // Set column widths
   const columnWidths = [
     { wch: 20 },  // word
-    { wch: 40 },  // definition
+    { wch: 40 },  // note
     { wch: 15 },  // level
-    { wch: 20 },  // type
-    { wch: 30 }   // note
+    { wch: 20 }   // type
   ];
   worksheet['!cols'] = columnWidths;
 
@@ -66,12 +62,11 @@ const parseWordExcel = (buffer) => {
 
     return data.map(row => ({
       word: String(row.word || '').trim(),
-      definition: String(row.definition || '').trim(),
+      note: String(row.note || '').trim(),
       level: Number(row.level) || 1,
       type: Number(row.type) || 1,
-      note: row.note ? String(row.note).trim() : null,
       is_active: true
-    })).filter(item => item.word && item.definition); // Filter out rows with missing required fields
+    })).filter(item => item.word && item.note); // Filter out rows with missing required fields
   } catch (error) {
     throw new Error('Failed to parse Excel file: ' + error.message);
   }
@@ -87,8 +82,8 @@ const validateExcelWordData = (wordData) => {
     return 'Invalid word text (max 100 characters)';
   }
 
-  if (!wordData.definition || typeof wordData.definition !== 'string') {
-    return 'Definition is required';
+  if (!wordData.note || typeof wordData.note !== 'string') {
+    return 'Note is required';
   }
 
   if (wordData.level < 1 || wordData.level > 5) {

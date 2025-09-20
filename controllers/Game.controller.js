@@ -58,6 +58,22 @@ const sanitizeGameData = (data) => {
 };
 
 class GameController {
+  async detail(req, res) {
+    try {
+      const { id } = req.params;
+
+      const game = await gameRepository.getGameById(id);
+      if (!game) {
+        return messageManager.notFound('game', res);
+      }
+
+      return messageManager.fetchSuccess('game', game, res);
+    } catch (error) {
+      console.error('Get game detail error:', error);
+      return messageManager.fetchFailed('game', res, error.message);
+    }
+  }
+
   async list(req, res) {
     try {
       const { readingId } = req.params;
@@ -69,7 +85,7 @@ class GameController {
         type = null
       } = req.query;
 
-      const reading = await sequelize.models.Reading.findByPk(readingId);
+      const reading = await sequelize.models.KidReading.findByPk(readingId);
       if (!reading) {
         return messageManager.notFound('reading', res);
       }
@@ -178,7 +194,7 @@ class GameController {
         return messageManager.validationFailed('game', res, validationError);
       }
 
-      const reading = await sequelize.models.Reading.findByPk(readingId);
+      const reading = await sequelize.models.KidReading.findByPk(readingId);
       if (!reading) {
         await transaction.rollback();
         return messageManager.notFound('reading', res);

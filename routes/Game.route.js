@@ -7,30 +7,39 @@ const upload = require("../middlewares/File.middleware");
 
 router.use(authMiddleware);
 
-router.post('/admin/readings/:readingId/games',
+router.post('/teacher/readings/:readingId/games',
   teacherOnly,
   upload.fields([{ name: 'image', maxCount: 1 }]),
   gameController.create
 );
 
-router.get('/admin/readings/:readingId/games',
+router.get('/teacher/readings/:readingId/games',
   teacherOnly,
   gameController.list
 );
 
-router.put('/admin/games/:id',
+router.get('/teacher/games/:id',
+  teacherOnly,
+  gameController.detail
+);
+
+router.put('/teacher/games/:id',
   teacherOnly,
   upload.fields([{ name: 'image', maxCount: 1 }]),
   gameController.update
 );
 
-router.delete('/admin/games/:id',
+router.delete('/teacher/games/:id',
   teacherOnly,
   gameController.delete
 );
 
 router.get('/readings/:readingId/games',
   gameController.list
+);
+
+router.get('/games/:id',
+  gameController.detail
 );
 
 module.exports = router;

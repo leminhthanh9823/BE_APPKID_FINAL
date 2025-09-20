@@ -36,9 +36,9 @@ class GameRepository {
 
     const createdGame = await Game.findByPk(game.id, {
       include: [{
-        model: sequelize.models.Reading,
+        model: sequelize.models.KidReading,
         as: 'prerequisiteReading',
-        attributes: ['id', 'name']
+        attributes: ['id', 'title']
       }],
       transaction
     });
@@ -49,9 +49,9 @@ class GameRepository {
   async getGameById(id) {
     return await Game.findByPk(id, {
       include: [{
-        model: sequelize.models.Reading,
+        model: sequelize.models.KidReading,
         as: 'prerequisiteReading',
-        attributes: ['id', 'name']
+        attributes: ['id', 'title']
       }]
     });
   }
@@ -71,9 +71,9 @@ class GameRepository {
 
     const studentCount = await sequelize.models.StudentReading.count({
       where: {
-        reading_id: game.prerequisite_reading_id,
+        kid_reading_id: game.prerequisite_reading_id,
         game_id: id,
-        status: 'completed'
+        is_completed: 1
       }
     });
 
@@ -92,9 +92,9 @@ class GameRepository {
 
       const hasRecords = await sequelize.models.StudentReading.count({
         where: {
-          reading_id: game.prerequisite_reading_id,
+          kid_reading_id: game.prerequisite_reading_id,
           game_id: id,
-          status: 'completed'
+          is_completed: 1
         },
         transaction
       });
@@ -172,35 +172,36 @@ class GameRepository {
       where: whereConditions,
       include: [
         {
-          model: sequelize.models.Reading,
+          model: sequelize.models.KidReading,
           as: 'prerequisiteReading',
-          attributes: ['id', 'name']
-        },
-        {
-          model: GameWord,
-          as: 'gameWords',
-          attributes: [[sequelize.fn('COUNT', sequelize.col('gameWords.id')), 'wordCount']],
-          required: false
+          attributes: ['id', 'title']
         }
       ],
       attributes: {
         include: [
           [
             sequelize.literal(`(
-              SELECT COUNT(DISTINCT sr.student_id)
+              SELECT COUNT(DISTINCT sr.kid_student_id)
               FROM student_readings sr
-              WHERE sr.reading_id = Game.prerequisite_reading_id
-              AND sr.status = 'completed'
+              WHERE sr.kid_reading_id = games.prerequisite_reading_id
+              AND sr.is_completed = 1
             )`),
             'studentCompletionCount'
+          ],
+          [
+            sequelize.literal(`(
+              SELECT COUNT(gw.id)
+              FROM game_words gw
+              WHERE gw.game_id = games.id
+            )`),
+            'wordCount'
           ]
         ]
       },
       order: [['sequence_order', 'ASC']],
       limit: parseInt(limit),
       offset: (page - 1) * parseInt(limit),
-      distinct: true,
-      group: ['Game.id']
+      distinct: true
     });
 
     return {

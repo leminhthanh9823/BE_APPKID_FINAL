@@ -83,7 +83,7 @@ class KidReadingRepository {
         {
           model: db.ReadingCategory,
           as: "categories",
-          attributes: ["id", "title", "description", "grade_id", "image"],
+          attributes: ["id", "title", "description", "image"],
           through: { attributes: [] },
         },
       ],
@@ -113,7 +113,7 @@ class KidReadingRepository {
         {
           model: ReadingCategory,
           as: "categories",
-          attributes: ["id", "title", "description", "grade_id", "image"],
+          attributes: ["id", "title", "description", "image"],
           through: { attributes: [] },
           where: {
             id: categoryId,
@@ -256,7 +256,6 @@ class KidReadingRepository {
     searchTerm,
     sorts,
     is_active,
-    grade_id,
     category_ids = null
   ) {
     const where = {};
@@ -276,19 +275,12 @@ class KidReadingRepository {
       let includeCategories = {
         model: db.ReadingCategory,
         as: "categories",
-        attributes: ["id", "title", "description", "grade_id", "image"],
+        attributes: ["id", "title", "description", "image"],
         through: { attributes: [] },
       };
       if (category_ids && category_ids.length > 0) {
         includeCategories.where = {
           id: { [Op.in]: category_ids },
-        };
-        includeCategories.required = true;
-      }
-      if (grade_id !== null && grade_id !== undefined) {
-        includeCategories.where = {
-          ...(includeCategories.where || {}),
-          grade_id,
         };
         includeCategories.required = true;
       }
@@ -310,7 +302,7 @@ class KidReadingRepository {
             {
               model: db.ReadingCategory,
               as: "categories",
-              attributes: ["id", "title", "description", "grade_id", "image"],
+              attributes: ["id", "title", "description", "image"],
               through: { attributes: [] },
             },
           ],
@@ -319,10 +311,9 @@ class KidReadingRepository {
       result.rows = fullReadings.map((reading) => {
         const readingData = reading.get ? reading.get({ plain: true }) : reading;
         const categories = readingData.categories || [];
-        const grades = [...new Set(categories.map(cat => cat.grade_id).filter(g => g !== null && g !== undefined))];
         return {
           ...readingData,
-          grades,
+          categories
         };
       });
       return result;
@@ -372,7 +363,7 @@ class KidReadingRepository {
         {
           model: ReadingCategory,
           as: "categories",
-          attributes: ["id", "title", "description", "grade_id", "image"],
+          attributes: ["id", "title", "description", "image"],
           through: { attributes: [] },
         },
       ],
@@ -388,24 +379,7 @@ class KidReadingRepository {
     });
   }
 
-  async findGradesByCategoryIds(categoryIds) {
-    return this.withRetry(async () => {
-      const categories = await ReadingCategory.findAll({
-        where: {
-          id: { [Op.in]: categoryIds },
-        },
-        attributes: ['grade_id'],
-        group: ['grade_id'],
-        raw: true
-      });
-
-      const uniqueGrades = [...new Set(categories.map(cat => cat.grade_id))]
-        .filter(gradeId => gradeId !== null && gradeId !== undefined)
-        .sort((a, b) => a - b);
-
-      return uniqueGrades;
-    });
-  }
+  // Method removed as grade functionality is no longer needed
 
   async checkIsPracticed(readingId) {
     return this.withRetry(async () => {

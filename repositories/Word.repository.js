@@ -1,6 +1,5 @@
 const { Word, GameWord, Game, sequelize } = require('../models');
 const { Op } = require('sequelize');
-const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
 
 class WordRepository {
   async findByWordText(wordText) {
@@ -119,7 +118,6 @@ class WordRepository {
       search = '',
       level = null,
       type = null,
-      isActive = null,
       isActive = null
     } = options;
 
@@ -128,7 +126,7 @@ class WordRepository {
     if (search) {
       whereConditions[Op.or] = [
         { word: { [Op.like]: `%${search}%` } },
-        { definition: { [Op.like]: `%${search}%` } },
+        { note: { [Op.like]: `%${search}%` } },
         { note: { [Op.like]: `%${search}%` } }
       ];
     }
@@ -215,7 +213,7 @@ class WordRepository {
           model: Word,
           through: GameWord,
           as: 'words',
-          attributes: ['id', 'word', 'definition', 'image', 'level', 'type'],
+          attributes: ['id', 'word', 'note', 'image', 'level', 'type'],
           include: [{
             model: GameWord,
             as: 'gameWords',
@@ -294,6 +292,56 @@ class WordRepository {
       await transaction.rollback();
       throw error;
     }
+  }
+
+  async getWordsByGame(gameId, options = {}) {
+    const {
+      page = 1,
+      limit = 10,
+      searchTerm = ''
+    } = options;
+
+    const whereConditions = {};
+    
+    if (searchTerm) {
+      whereConditions[Op.or] = [
+        { word: { [Op.like]: `%${searchTerm}%` } },
+        { note: { [Op.like]: `%${searchTerm}%` } }
+      ];
+    }
+
+    const { rows: words, count } = await Word.findAndCountAll({
+      where: whereConditions,
+      include: [{
+        model: Game,
+        through: {
+          model: GameWord,
+          where: { game_id: gameId },
+          attributes: ['sequence_order']
+        },
+        as: 'games',
+        where: { id: gameId },
+        attributes: ['id', 'name'],
+        required: true
+      }],
+      attributes: ['id', 'word', 'note', 'image', 'level', 'type', 'is_active', 'created_at'],
+      order: [
+        [{ model: Game, as: 'games' }, GameWord, 'sequence_order', 'ASC']
+      ],
+      limit: parseInt(limit),
+      offset: (page - 1) * parseInt(limit),
+      distinct: true
+    });
+
+    return {
+      words,
+      pagination: {
+        total: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page),
+        limit: parseInt(limit)
+      }
+    };
   }
 }
 
