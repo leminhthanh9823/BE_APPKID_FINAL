@@ -68,7 +68,7 @@ class LearningPathRepository {
             {
               model: db.Game,
               as: 'game',
-              attributes: ['id', 'title'],
+              attributes: ['id', 'name'],
               required: false
             }
           ]
