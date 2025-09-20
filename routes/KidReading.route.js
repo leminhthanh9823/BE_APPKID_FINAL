@@ -48,4 +48,10 @@ router.post(
   jwtMiddleware,
   controller.getByCategoryAndStudentId
 );
+
+// API cho UC_LP04 - Get available readings by category
+router.get("/:categoryId/available-readings", 
+  controller.getAvailableReadingsByCategory
+);
+
 module.exports = router;

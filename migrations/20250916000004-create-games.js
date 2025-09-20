@@ -25,10 +25,7 @@ module.exports = {
       prerequisite_reading_id: {
         type: Sequelize.BIGINT.UNSIGNED,
         allowNull: true,
-        references: {
-          model: 'kid_readings',
-          key: 'id'
-        },
+       
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
       },
