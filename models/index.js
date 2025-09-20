@@ -20,10 +20,6 @@ db.sequelize = sequelize;
 db.ReadingCategory = require("./ReadingCategory.model")(sequelize, Sequelize);
 db.StudentReading = require("./StudentReading.model")(sequelize, Sequelize);
 db.KidReading = require("./KidReading.model")(sequelize, Sequelize);
-db.ReadingCategoryRelations = require("./ReadingCategoryRelations.model")(
-  sequelize,
-  Sequelize
-);
 db.Option = require("./KidQuestionBankOptions.model")(sequelize, Sequelize);
 db.Question = require("./KidQuestions.model")(sequelize, Sequelize);
 db.KidStudent = require("./KidStudent.model")(sequelize, Sequelize);
@@ -66,6 +62,8 @@ db.FeedbackCategory.associate && db.FeedbackCategory.associate(db);
 db.KidReading.associate && db.KidReading.associate(db);
 db.Notify.associate && db.Notify.associate(db);
 db.NotifyTarget.associate && db.NotifyTarget.associate(db);
+db.ReadingCategory.associate && db.ReadingCategory.associate(db);
+db.StudentReading.associate && db.StudentReading.associate(db);
 
 // Associate new models
 db.Game.associate && db.Game.associate(db);
@@ -140,44 +138,6 @@ db.KidStudent.belongsTo(db.User, {
 //   foreignKey: "user_id",
 //   as: "user",
 // });
-
-// ReadingCategory <-> KidReading (many-to-many)
-db.ReadingCategory.belongsToMany(db.KidReading, {
-  through: db.ReadingCategoryRelations,
-  foreignKey: "category_id",
-  otherKey: "reading_id",
-  as: "kid_readings",
-});
-db.KidReading.belongsToMany(db.ReadingCategory, {
-  through: db.ReadingCategoryRelations,
-  foreignKey: "reading_id",
-  otherKey: "category_id",
-  as: "categories",
-});
-
-// ReadingCategoryRelations (additional info for joins)
-db.ReadingCategoryRelations.belongsTo(db.KidReading, {
-  foreignKey: "reading_id",
-  as: "kid_readings",
-});
-db.ReadingCategoryRelations.belongsTo(db.ReadingCategory, {
-  foreignKey: "category_id",
-  as: "categories",
-});
-
-// EBook <-> EBookCategory (many-to-many)
-db.EBook.belongsToMany(db.EBookCategory, {
-  through: db.EBookCategoryRelation,
-  foreignKey: "elibrary_id",
-  otherKey: "elibrary_categories_id",
-  as: "categories",
-});
-db.EBookCategory.belongsToMany(db.EBook, {
-  through: db.EBookCategoryRelation,
-  foreignKey: "elibrary_categories_id",
-  otherKey: "elibrary_id",
-  as: "ebooks",
-});
 
 // Student <-> Ebook
 db.EBook.hasMany(db.StudentEBookRelation, {

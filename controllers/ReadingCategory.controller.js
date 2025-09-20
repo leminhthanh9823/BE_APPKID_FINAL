@@ -278,6 +278,35 @@ async function toggleStatus(req, res) {
   }
 }
 
+async function getReadingCategoriesNoFilter(req, res) {
+  try {
+    // Luôn lấy category is_active = 1
+    let categories = await repository.findAllNoFilter(true);
+    // Đảm bảo is_active là number (1 hoặc 0)
+    categories = categories.map(c => ({
+      ...c,
+      is_active: c.is_active ? 1 : 0
+    }));
+
+    // Create response data
+    const responseData = {
+      categories,
+      totalCategories: categories.length
+    };
+
+    // Use messageManager for consistent response format
+    return messageManager.fetchSuccess(
+      "readingcategory",
+      responseData,
+      res
+    );
+
+  } catch (error) {
+    console.error("Error getting reading categories (no filter):", error);
+    return messageManager.fetchFailed("readingcategory", res, error.message);
+  }
+}
+
 module.exports = {
   getReadingCategories,
   getReadingCategoryById,
@@ -287,4 +316,5 @@ module.exports = {
   deleteReadingCategory,
   toggleStatus,
   getReadingCategoriesWithStats,
+  getReadingCategoriesNoFilter
 };

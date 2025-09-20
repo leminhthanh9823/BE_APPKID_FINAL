@@ -557,6 +557,39 @@ async function getListReading(req, res) {
   }
 }
 
+/**
+ * GET /api/categories/:categoryId/available-readings
+ * Load readings thuộc về một category cụ thể (cho category-specific selection)
+ */
+async function getAvailableReadingsByCategory(req, res) {
+  try {
+    const categoryId = parseInt(req.params.categoryId);
+    if (isNaN(categoryId)) {
+      return messageManager.validationFailed("kidreading", res, "Invalid category");
+    }
+
+    // Extract filters from query params
+    const filters = {
+      search: req.query.search,
+      difficulty_level: req.query.difficulty_level ?? null,
+    };
+
+    // Get readings by category with availability info
+    const result = await repository.findAvailableReadingsByCategory(categoryId, filters);
+    
+    if (!result) {
+      return messageManager.notFound("readingcategory", res);
+    }
+
+    // Create response using messageManager
+    return messageManager.fetchSuccess("kidreading", result, res);
+
+  } catch (error) {
+    console.error("Error getting available readings by category:", error);
+    return messageManager.fetchFailed("kidreading", res, error.message);
+  }
+}
+
 module.exports = {
   getAll,
   getById,
@@ -568,5 +601,6 @@ module.exports = {
   getByCategoryAndStudentId,
   toggleStatus,
   getKidReadingByCategory,
-  getListReading
+  getListReading,
+  getAvailableReadingsByCategory
 };

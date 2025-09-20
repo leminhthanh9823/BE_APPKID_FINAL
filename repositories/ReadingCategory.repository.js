@@ -149,6 +149,46 @@ class ReadingCategoryRepository {
 
     return ReadingCategory.count({ where: whereClause });
   }
+
+  async findAllNoFilter(isActive = null) {
+    const whereClause = {};
+    if (isActive !== null) {
+      whereClause.is_active = isActive ? 1 : 0;
+    }
+
+    // Dùng include để đếm số lượng reading active cho từng category
+    const categories = await ReadingCategory.findAll({
+      where: whereClause,
+      attributes: [
+        'id',
+        'title',
+        'description',
+        'image',
+        'is_active',
+        [Sequelize.fn('COUNT', Sequelize.col('kid_readings.id')), 'reading_count']
+      ],
+      include: [
+        {
+          model: KidReading,
+          as: 'kid_readings',
+          attributes: [],
+          where: { is_active: 1 },
+          required: false
+        }
+      ],
+  group: ['reading_categories.id'],
+      order: [['title', 'ASC']]
+    });
+
+    return categories.map(category => ({
+      id: category.id,
+      title: category.title,
+      description: category.description,
+      image: category.image,
+      is_active: Boolean(category.is_active),
+      reading_count: parseInt(category.dataValues.reading_count) || 0
+    }));
+  }
 }
 
 module.exports = new ReadingCategoryRepository();

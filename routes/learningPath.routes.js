@@ -39,4 +39,47 @@ router.put("/edit/:id",
   learningPathController.updateLearningPath
 );
 
+/**
+ * Nghiệp vụ 2: Quản lý items trong learning path (UC_LP04)
+ */
+// POST /:id/items - Lấy danh sách items trong learning path
+router.post("/:id/items", 
+  learningPathController.getItemsInLearningPath
+);
+
+// mobile: GET /:pathId/categories - Lấy danh sách categories có trong learning path
+router.get("/mobile/:pathId/categories",
+  learningPathController.getCategoriesInLearningPath
+);
+
+// mobile: GET /:pathId/categories/:categoryId/items - Lấy danh sách items trong category cụ thể
+router.get("/mobile/:pathId/categories/:categoryId/:studentId/items",
+  learningPathController.getItemsInCategory
+);
+
+// POST /:pathId/add-items - Thêm readings vào learning path
+router.post("/:id/add-items",
+  learningPathController.addItemsToLearningPath
+);
+
+// PUT /:id/categories/reorder - Sắp xếp lại thứ tự categories
+router.put("/:id/categories/reorder",
+  learningPathController.reorderCategories
+);
+
+// PUT /:pathId/categories/:categoryId/items/reorder - Sắp xếp lại thứ tự items trong category
+router.put("/:pathId/categories/:categoryId/items/reorder",
+  learningPathController.reorderItemsInCategory
+);
+
+// DELETE /:pathId/readings/:readingId - Xóa reading khỏi learning path
+router.delete("/:pathId/readings/:readingId",
+  learningPathController.deleteReadingFromPath
+);
+
+// DELETE /:pathId/games/:gameId - Xóa game khỏi learning path  
+router.delete("/:pathId/games/:gameId",
+  learningPathController.deleteGameFromPath
+);
+
 module.exports = router;

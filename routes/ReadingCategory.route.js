@@ -7,6 +7,7 @@ const { adminOrTeacher } = require("../middlewares/Role.middleware.js");
 
 router.post("/all", jwtMiddleware, controller.getReadingCategories);
 router.post("/stats", jwtMiddleware, adminOrTeacher, controller.getReadingCategoriesWithStats);
+router.get("/get-list-no-filter",  controller.getReadingCategoriesNoFilter);
 router.get("/:id", jwtMiddleware, controller.getReadingCategoryById);
 // router.post(
 //   "/grade/:grade_id",
