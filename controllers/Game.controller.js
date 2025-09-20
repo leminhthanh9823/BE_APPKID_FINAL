@@ -1,6 +1,7 @@
 const { sequelize } = require('../models');
 const gameRepository = require('../repositories/Game.repository');
 const messageManager = require('../helpers/MessageManager.helper');
+const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
 
 const validateGameData = (data, isUpdate = false) => {
   if (!isUpdate || data.name !== undefined) {
@@ -160,9 +161,24 @@ class GameController {
         }
       }
 
-      const updateData = sanitizeGameData({ 
+      let updateData = sanitizeGameData({ 
         name, description, type, is_active: isActive 
       });
+
+      if (req.file) {
+        if (!req.file.mimetype.startsWith('image/')) {
+          await transaction.rollback();
+          return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
+        }
+
+        const imageUrl = await uploadToMinIO(req.file, "games");
+        if (!imageUrl) {
+          await transaction.rollback();
+          return messageManager.updateFailed('game', res, 'Failed to upload image');
+        }
+        
+        updateData.image = imageUrl;
+      }
 
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) {
@@ -208,7 +224,22 @@ class GameController {
         );
       }
 
-      const gameData = sanitizeGameData({ name, description, type });
+      let gameData = sanitizeGameData({ name, description, type });
+
+      if (req.file) {
+        if (!req.file.mimetype.startsWith('image/')) {
+          await transaction.rollback();
+          return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
+        }
+
+        const imageUrl = await uploadToMinIO(req.file, "games");
+        if (!imageUrl) {
+          await transaction.rollback();
+          return messageManager.createFailed('game', res, 'Failed to upload image');
+        }
+        
+        gameData.image = imageUrl;
+      }
 
       const createdGame = await gameRepository.createGame(
         gameData,
@@ -223,6 +254,60 @@ class GameController {
       await transaction.rollback();
       console.error('Create game error:', error);
       return messageManager.createFailed('game', res, error.message);
+    }
+  }
+
+  async reorder(req, res) {
+    try {
+      const { games } = req.body;
+      
+      if (!games || !Array.isArray(games)) {
+        return messageManager.validationFailed('game', res, 'Games array is required');
+      }
+
+      if (games.length === 0) {
+        return messageManager.validationFailed('game', res, 'Games array cannot be empty');
+      }
+
+      // Validate structure and duplicates
+      const gameIds = [];
+      const sequenceOrders = [];
+      
+      for (const game of games) {
+        if (!game.id || !game.sequence_order) {
+          return messageManager.validationFailed('game', res, 'Each game must have id and sequence_order');
+        }
+
+        const gameId = parseInt(game.id);
+        const sequenceOrder = parseInt(game.sequence_order);
+
+        if (isNaN(gameId) || isNaN(sequenceOrder)) {
+          return messageManager.validationFailed('game', res, 'Game id and sequence_order must be valid numbers');
+        }
+
+        if (sequenceOrder < 1) {
+          return messageManager.validationFailed('game', res, 'Sequence order must be greater than 0');
+        }
+
+        gameIds.push(gameId);
+        sequenceOrders.push(sequenceOrder);
+      }
+
+      // Check for duplicates
+      if (new Set(gameIds).size !== gameIds.length) {
+        return messageManager.validationFailed('game', res, 'Duplicate game IDs are not allowed');
+      }
+
+      if (new Set(sequenceOrders).size !== sequenceOrders.length) {
+        return messageManager.validationFailed('game', res, 'Duplicate sequence orders are not allowed');
+      }
+
+      // Execute bulk update directly
+      const result = await gameRepository.reorderGames(games);
+
+      return messageManager.updateSuccess('game', result, res);
+    } catch (error) {
+      return messageManager.updateFailed('game', res, error.message);
     }
   }
 }

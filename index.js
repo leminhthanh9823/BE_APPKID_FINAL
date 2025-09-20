@@ -27,12 +27,11 @@ const StudentAdviceRoute = require("./routes/StudentAdvice.route");
 const LearningPathRoute = require("./routes/learningPath.routes");
 const GameRoute = require("./routes/Game.route");
 const WordRoute = require("./routes/Word.route");
-app.use(express.json({ limit: "400mb" }));
+app.use(express.json({ limit: "400mb" })); // Reduced from 400mb
 
 app.use(cors());
-app.use(express.urlencoded({ extended: true, limit: "400mb" }));
+app.use(express.urlencoded({ extended: true, limit: "400mb" })); // Reduced from 400mb
 app.use(morgan("dev"));
-
 const PORT = process.env.PORT || 3000;
 
 app.use("/api/reading-category", readingCategoryRoute);

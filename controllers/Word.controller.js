@@ -75,10 +75,6 @@ const sanitizeWordData = (data) => {
 
 async function createWord(req, res) {
   try {
-    console.log('Request body:', req.body);
-    console.log('Request file:', req.file);
-    console.log('Content-Type:', req.headers['content-type']);
-    
     // Check if client is sending JSON instead of FormData
     if (req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
       return messageManager.validationFailed('word', res, 

@@ -2,20 +2,25 @@ const express = require("express");
 const router = express.Router();
 const gameController = require("../controllers/Game.controller.js");
 const authMiddleware = require("../middlewares/Auth.middleware.js");
-const { teacherOnly } = require("../middlewares/Role.middleware.js");
+const { teacherOnly, teacherOnlyFast } = require("../middlewares/Role.middleware.js");
 const upload = require("../middlewares/File.middleware");
 
 router.use(authMiddleware);
 
 router.post('/teacher/readings/:readingId/games',
   teacherOnly,
-  upload.fields([{ name: 'image', maxCount: 1 }]),
+  upload.single('image'),
   gameController.create
 );
 
 router.get('/teacher/readings/:readingId/games',
   teacherOnly,
   gameController.list
+);
+
+router.put('/teacher/games/reorder',
+  teacherOnlyFast,
+  gameController.reorder
 );
 
 router.get('/teacher/games/:id',
@@ -25,7 +30,7 @@ router.get('/teacher/games/:id',
 
 router.put('/teacher/games/:id',
   teacherOnly,
-  upload.fields([{ name: 'image', maxCount: 1 }]),
+  upload.single('image'),
   gameController.update
 );
 
