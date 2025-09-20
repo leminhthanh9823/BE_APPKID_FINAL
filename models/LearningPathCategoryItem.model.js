@@ -1,25 +1,21 @@
 module.exports = (sequelize, DataTypes) => {
-  const LearningPathItem = sequelize.define('learning_path_items', {
+  const LearningPathCategoryItem = sequelize.define('learning_path_category_items', {
     id: {
       type: DataTypes.BIGINT.UNSIGNED,
       primaryKey: true,
       autoIncrement: true
     },
-    learning_path_category_id: {
+    learning_path_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false
     },
-    reading_id: {
+    category_id: {
       type: DataTypes.BIGINT.UNSIGNED,
-      allowNull: true
-    },
-    game_id: {
-      type: DataTypes.BIGINT.UNSIGNED,
-      allowNull: true
+      allowNull: false
     },
     sequence_order: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: false
     },
     is_active: {
       type: DataTypes.TINYINT,
@@ -36,31 +32,31 @@ module.exports = (sequelize, DataTypes) => {
       onUpdate: sequelize.literal('CURRENT_TIMESTAMP')
     }
   }, {
-    tableName: 'learning_path_items',
+    tableName: 'learning_path_category_items',
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
 
-  LearningPathItem.associate = function (models) {
-    // Belongs to learning path category item
-    LearningPathItem.belongsTo(models.LearningPathCategoryItem, {
-      foreignKey: 'learning_path_category_id',
-      as: 'learningPathCategory'
+  LearningPathCategoryItem.associate = function (models) {
+    // Belongs to learning path
+    LearningPathCategoryItem.belongsTo(models.LearningPath, {
+      foreignKey: 'learning_path_id',
+      as: 'learningPath'
     });
     
-    // Belongs to reading (optional)
-    LearningPathItem.belongsTo(models.KidReading, {
-      foreignKey: 'reading_id',
-      as: 'reading'
+    // Belongs to reading category
+    LearningPathCategoryItem.belongsTo(models.ReadingCategory, {
+      foreignKey: 'category_id',
+      as: 'category'
     });
-
-    // Belongs to game (optional)
-    LearningPathItem.belongsTo(models.Game, {
-      foreignKey: 'game_id',
-      as: 'game'
+    
+    // Has many learning path items
+    LearningPathCategoryItem.hasMany(models.LearningPathItem, {
+      foreignKey: 'learning_path_category_id',
+      as: 'items'
     });
   };
 
-  return LearningPathItem;
+  return LearningPathCategoryItem;
 };

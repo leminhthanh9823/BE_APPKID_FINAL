@@ -53,6 +53,7 @@ db.NotifyTarget = require("./NotifyTarget.model")(sequelize, Sequelize);
 db.Game = require("./Game.model")(sequelize, Sequelize);
 db.LearningPath = require("./LearningPath.model")(sequelize, Sequelize);
 db.LearningPathItem = require("./LearningPathItem.model")(sequelize, Sequelize);
+db.LearningPathCategoryItem = require("./LearningPathCategoryItem.model")(sequelize, Sequelize);
 
 // Words models
 db.Word = require("./Words.model")(sequelize, Sequelize);
@@ -70,6 +71,7 @@ db.NotifyTarget.associate && db.NotifyTarget.associate(db);
 db.Game.associate && db.Game.associate(db);
 db.LearningPath.associate && db.LearningPath.associate(db);
 db.LearningPathItem.associate && db.LearningPathItem.associate(db);
+db.LearningPathCategoryItem.associate && db.LearningPathCategoryItem.associate(db);
 db.Word.associate && db.Word.associate(db);
 db.GameWord.associate && db.GameWord.associate(db);
 // Relationships

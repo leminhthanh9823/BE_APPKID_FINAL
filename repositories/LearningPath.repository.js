@@ -21,15 +21,6 @@ class LearningPathRepository {
 
     const result = await db.LearningPath.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: db.LearningPathItem,
-          as: "items",
-          attributes: [],
-          where: { is_active: 1 },
-          required: false
-        }
-      ],
       attributes: [
         'id',
         'name', 
@@ -47,18 +38,58 @@ class LearningPathRepository {
     // Get additional data in separate queries for better performance
     const learningPathIds = result.rows.map(path => path.id);
     
-    // Count active items for each learning path
-    const itemCounts = await db.LearningPathItem.findAll({
+    // Count active items for each learning path through LearningPathCategoryItem
+    // Query từ LearningPathCategoryItem → LearningPathItem → KidReading/Game
+    const pathCategoryItems = await db.LearningPathCategoryItem.findAll({
       where: {
         learning_path_id: { [Op.in]: learningPathIds },
         is_active: 1
       },
-      attributes: [
-        'learning_path_id',
-        [db.sequelize.fn('COUNT', '*'), 'count']
-      ],
-      group: ['learning_path_id'],
-      raw: true
+      include: [
+        {
+          model: db.ReadingCategory,
+          as: 'category',
+          attributes: ['id', 'title'],
+          required: false
+        },
+        {
+          model: db.LearningPathItem,
+          as: 'items',
+          where: { is_active: 1 },
+          required: false,
+          attributes: ['id', 'reading_id', 'game_id', 'sequence_order'],
+          include: [
+            {
+              model: db.KidReading,
+              as: 'reading',
+              attributes: ['id', 'title'],
+              required: false
+            },
+            {
+              model: db.Game,
+              as: 'game',
+              attributes: ['id', 'title'],
+              required: false
+            }
+          ]
+        }
+      ]
+    });
+
+    // Process and count items for each learning path
+    const itemCountMap = new Map();
+    pathCategoryItems.forEach(pathCategoryItem => {
+      const learningPathId = pathCategoryItem.learning_path_id;
+      let count = 0;
+      
+      // Count items directly từ LearningPathItem
+      if (pathCategoryItem.items && pathCategoryItem.items.length > 0) {
+        count += pathCategoryItem.items.length;
+      }
+      
+      // Accumulate counts for same learning path
+      const currentCount = itemCountMap.get(learningPathId) || 0;
+      itemCountMap.set(learningPathId, currentCount + count);
     });
 
     // Check student progress for each learning path
@@ -74,11 +105,7 @@ class LearningPathRepository {
       raw: true
     });
 
-    // Create lookup maps
-    const itemCountMap = new Map(
-      itemCounts.map(item => [item.learning_path_id, parseInt(item.count)])
-    );
-    
+    // Create progress lookup map
     const progressMap = new Map(
       progressChecks.map(progress => [progress.learning_path_id, parseInt(progress.student_count) > 0])
     );

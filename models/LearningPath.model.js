@@ -44,10 +44,10 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   LearningPath.associate = function (models) {
-    // Learning path items
-    LearningPath.hasMany(models.LearningPathItem, {
+    // Has many category items (bridge table to categories)
+    LearningPath.hasMany(models.LearningPathCategoryItem, {
       foreignKey: 'learning_path_id',
-      as: 'items'
+      as: 'categoryItems'
     });
     
     // Student readings following this path

@@ -36,7 +36,13 @@ module.exports = (sequelize, DataTypes) => {
     // Has many readings (one-to-many relationship)
     ReadingCategory.hasMany(models.KidReading, {
       foreignKey: 'category_id',
-      as: 'readings'
+      as: 'kid_readings'
+    });
+    
+    // Has many learning path category items
+    ReadingCategory.hasMany(models.LearningPathCategoryItem, {
+      foreignKey: 'category_id',
+      as: 'learningPathCategoryItems'
     });
   };
 
