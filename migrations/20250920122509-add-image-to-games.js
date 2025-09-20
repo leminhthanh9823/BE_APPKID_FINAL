@@ -6,7 +6,7 @@ module.exports = {
     // Add image column to games table
     await queryInterface.addColumn('games', 'image', {
       type: Sequelize.STRING(255),
-      allowNull: false,
+      allowNull: true,
       after: 'name' // Position the image column after name
     });
   },
