@@ -64,7 +64,13 @@ module.exports = (sequelize, DataTypes) => {
     // Learning path relationships
     KidReading.hasMany(models.LearningPathItem, {
       foreignKey: "reading_id",
-      as: "learningPathItems",
+      as: "learning_path_items",
+    });
+    
+    // Has games that use this reading as prerequisite
+    KidReading.hasMany(models.Game, {
+      foreignKey: "prerequisite_reading_id",
+      as: "games",
     });
     
     // Student readings

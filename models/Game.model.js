@@ -5,6 +5,10 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
+    image:{
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
     name: {
       type: DataTypes.STRING(255),
       allowNull: false
@@ -50,9 +54,7 @@ module.exports = (sequelize, DataTypes) => {
     // Has many learning path items
     Game.hasMany(models.LearningPathItem, {
       foreignKey: 'game_id',
-      as: 'learningPathItems',
-      onDelete: "CASCADE",
-      hooks: true
+      as: 'learning_path_items'
     });
     
     // Belongs to prerequisite reading
