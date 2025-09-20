@@ -82,7 +82,7 @@ class KidReadingRepository {
       include: [
         {
           model: db.ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["id", "title", "description", "grade_id", "image"],
           through: { attributes: [] },
         },
@@ -95,8 +95,8 @@ class KidReadingRepository {
       const plain = reading.get({ plain: true });
       return {
         ...plain,
-        categories: plain.categories || [],
-        category: plain.categories?.[0] || null,
+        categories: plain.category || [],
+        category: plain.category || null,
       };
     });
 
@@ -415,6 +415,112 @@ class KidReadingRepository {
       });
 
       return reading !== null;
+    });
+  }
+
+  async findAvailableReadingsByCategory(categoryId, filters = {}) {
+    const { 
+      search, 
+      difficulty_level, 
+    } = filters;
+
+    // Build where clause for KidReading
+    const readingWhereClause = {};
+    
+    if (search && search.trim()) {
+      readingWhereClause.title = { [Op.like]: `%${search.trim()}%` };
+    }
+    
+    if (difficulty_level && difficulty_level >= 1 && difficulty_level <= 5) {
+      readingWhereClause.difficulty = parseInt(difficulty_level);
+    }
+    readingWhereClause.is_active = 1;
+
+    return this.withRetry(async () => {
+      // Get category info first
+      const category = await db.ReadingCategory.findByPk(categoryId, {
+        attributes: ['id', 'title', 'description']
+      });
+
+      if (!category) {
+        return null;
+      }
+
+      // Get readings in this category with availability check
+      const readings = await db.KidReading.findAll({
+        where: readingWhereClause,
+        attributes: ['id', 'title', 'image', 'difficulty_level', 'is_active'],
+        include: [
+          {
+            model: db.ReadingCategory,
+            as: 'category',
+            where: { id: categoryId },
+            attributes: [],
+            required: true
+          }
+        ],
+        order: [['title', 'ASC']]
+      });
+
+      // Check availability in learning paths for each reading
+      const readingIds = readings.map(r => r.id);
+      let availabilityMap = new Map();
+
+      if (readingIds.length > 0) {
+        // Query learning path items to check availability
+        const learningPathItems = await db.LearningPathItem.findAll({
+          where: {
+            reading_id: { [Op.in]: readingIds }
+          },
+          attributes: ['reading_id', 'learning_path_category_id'],
+          include: [
+            {
+              model: db.LearningPathCategoryItem,
+              as: 'learningPathCategory',
+              attributes: ['learning_path_id'],
+              include: [
+                {
+                  model: db.LearningPath,
+                  as: 'learningPath',
+                  where: { is_active: 1 },
+                  attributes: ['id', 'name'],
+                  required: true
+                }
+              ],
+              required: true
+            }
+          ]
+        });
+
+        // Map readings to their learning paths
+        learningPathItems.forEach(item => {
+          if (item.reading_id && item.learningPathCategory?.learningPath) {
+            availabilityMap.set(item.reading_id, {
+              learning_path_id: item.learningPathCategory.learningPath.id,
+              learning_path_name: item.learningPathCategory.learningPath.name
+            });
+          }
+        });
+      }
+
+      // Transform readings with availability info
+      let transformedReadings = readings.map(reading => {
+        const availability = availabilityMap.get(reading.id);
+        return {
+          id: reading.id,
+          title: reading.title,
+          image_url: reading.image,
+          difficulty_level: reading.difficulty_level,
+          is_active: Boolean(reading.is_active),
+          availability_learning_path_id: availability?.learning_path_id || null,
+          availability_name: availability ? 'In Learning Path' : 'Available'
+        };
+      });
+
+      return {
+        readings: transformedReadings,
+        totalReadings: transformedReadings.length
+      };
     });
   }
 }

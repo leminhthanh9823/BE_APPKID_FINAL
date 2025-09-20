@@ -280,9 +280,547 @@ async function updateLearningPath(req, res) {
   }
 }
 
+/**
+ * POST /api/learning-paths/:id/items
+ * Load và hiển thị danh sách items hiện tại trong learning path
+ */
+async function getItemsInLearningPath(req, res) {
+  try {
+    const pathId = parseInt(req.params.id);
+    if (isNaN(pathId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path ID");
+    }
+
+        console.log(req.body);
+    // Extract filters from query params
+    const filters = {
+      search: req.body.searchTerm,
+      difficultyFilter: req.body.difficultyFilter ?? null,
+      statusFilter: req.body.statusFilter ?? null,
+    };
+
+
+
+    // Get learning path items with categories
+    const result = await repository.findItemsInLearningPath(pathId, filters);
+    
+    if (!result) {
+      return messageManager.notFound("learningpath", res);
+    }
+
+    const { learningPath, categories } = result;
+
+    // Transform data to match API specification
+    const transformedCategories = categories.map(categoryItem => {
+      const items = categoryItem.items ? categoryItem.items.map(item => {
+        let itemData = {
+          id: item.id,
+          sequence_order: item.sequence_order,
+          is_active: Boolean(item.is_active)
+        };
+
+        // Handle reading item
+        if (item.reading) {
+          itemData = {
+            ...itemData,
+            name: item.reading.title,
+            reading_id: item.reading.id,
+            game_id: null,
+            image_url: item.reading.image,
+            difficulty: item.reading.difficulty,
+            prerequisite_reading_id: null
+          };
+        } 
+        // Handle game item  
+        else if (item.game) {
+          itemData = {
+            ...itemData,
+            name: item.game.name,
+            reading_id: null,
+            game_id: item.game.id,
+            image_url: null,
+            difficulty: null,
+            prerequisite_reading_id: item.game.prerequisite_reading_id
+          };
+        }
+
+        return itemData;
+      }) : [];
+
+      return {
+        category_id: categoryItem.category_id,
+        category_name: categoryItem.category.title,
+        items
+      };
+    });
+
+    // Calculate total items count
+    const totalItems = transformedCategories.reduce((total, category) => {
+      return total + category.items.length;
+    }, 0);
+
+    const responseData = {
+      learningPath,
+      categories: transformedCategories,
+      totalItems
+    };
+
+    // Use messageManager's successful response format but with custom message
+    return messageManager.fetchSuccess("learningpathitem", responseData, res);
+
+  } catch (error) {
+    console.error(error.message);
+    return messageManager.fetchFailed("learningpathitem", res, error.message);
+  }
+}
+
+/**
+ * POST /api/learning-paths/:pathId/add-items
+ * Thêm readings vào learning path
+ */
+async function addItemsToLearningPath(req, res) {
+  try {
+    const pathId = parseInt(req.params.id);
+    if (isNaN(pathId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path");
+    }
+
+    const { readingIds, isContinueOnDuplicate = false } = req.body;
+
+    // Validate input
+    if (!readingIds || !Array.isArray(readingIds) || readingIds.length === 0) {
+      return messageManager.validationFailed("learningpathitem", res, "List readings is empty");
+    }
+
+    // Validate all reading IDs are numbers
+    const invalidIds = readingIds.filter(id => isNaN(parseInt(id)));
+    if (invalidIds.length > 0) {
+      return messageManager.validationFailed("learningpathitem", res, "Some readings are invalid");
+    }
+
+    const numericReadingIds = readingIds.map(id => parseInt(id));
+
+    try {
+      const result = await repository.addItemsToPath(pathId, numericReadingIds, isContinueOnDuplicate);
+      
+      if (!result.success) {
+        if (result.duplicates) {
+          return messageManager.validationFailed("learningpathitem", res, result.message, {
+            duplicates: result.duplicates,
+            suggestion: "Set isContinueOnDuplicate=true to add only non-duplicate readings"
+          });
+        }
+        return messageManager.validationFailed("learningpathitem", res, result.message);
+      }
+
+      let message = result.message;
+      if (result.duplicates && result.duplicates.length > 0) {
+        message += ` (${result.duplicates.length} duplicate(s) skipped)`;
+      }
+
+      return messageManager.createSuccess("learningpathitem", {
+        added_items: result.added_items,
+        skipped_duplicates: result.duplicates || []
+      }, res, message);
+
+    } catch (error) {
+      console.error("Add items to learning path error:", error);
+      
+      if (error.message === 'Learning path not found') {
+        return messageManager.notFound("learningpath", res);
+      }
+      
+      if (error.message === 'One or more readings not found') {
+        return messageManager.notFound("kidreading", res, "One or more readings not found");
+      }
+      
+      if (error.message === 'Only readings from the same category can be added at once') {
+        return messageManager.validationFailed("learningpathitem", res, "Only readings from the same category can be added at once");
+      }
+      
+      return messageManager.createFailed("learningpathitem", res, error.message);
+    }
+
+  } catch (error) {
+    console.error("Add items controller error:", error);
+    return messageManager.createFailed("learningpathitem", res, error.message);
+  }
+}
+
+/**
+ * PUT /api/learning-paths/:id/categories/reorder
+ * Sắp xếp lại thứ tự các categories trong learning path
+ */
+async function reorderCategories(req, res) {
+  try {
+    const pathId = parseInt(req.params.id);
+    if (isNaN(pathId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path");
+    }
+
+    const { categoryOrders } = req.body;
+
+    // Validate input
+    if (!categoryOrders || !Array.isArray(categoryOrders) || categoryOrders.length === 0) {
+      return messageManager.validationFailed("learningpathitem", res, "Category orders are required");
+    }
+
+    // Validate each order item has required fields and valid numbers
+    const invalidItems = categoryOrders.filter(item => 
+      !item.category_id || 
+      item.sequence_order == null ||
+      isNaN(parseInt(item.category_id)) || 
+      isNaN(parseInt(item.sequence_order))
+    );
+
+    if (invalidItems.length > 0) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid category order data");
+    }
+
+    // Convert to numeric values
+    const numericCategoryOrders = categoryOrders.map(item => ({
+      category_id: parseInt(item.category_id),
+      sequence_order: parseInt(item.sequence_order)
+    }));
+
+    try {
+      const result = await repository.reorderCategories(pathId, numericCategoryOrders);
+      
+      if (!result.success) {
+        return messageManager.updateFailed("learningpathitem", res, result.message);
+      }
+
+      return messageManager.updateSuccess("learningpathitem", {
+        updated_categories: result.updated_categories
+      }, res, result.message);
+
+    } catch (error) {
+      console.error("Reorder categories error:", error);
+      
+      if (error.message === 'Learning path not found') {
+        return messageManager.notFound("learningpath", res);
+      }
+      
+      if (error.message === 'Some categories do not belong to this learning path') {
+        return messageManager.validationFailed("learningpathitem", res, "Some categories do not belong to this learning path");
+      }
+      
+      if (error.message === 'Category orders are required' || error.message === 'Invalid category order data') {
+        return messageManager.validationFailed("learningpathitem", res, error.message);
+      }
+      
+      return messageManager.updateFailed("learningpathitem", res, error.message);
+    }
+
+  } catch (error) {
+    console.error("Reorder categories controller error:", error);
+    return messageManager.updateFailed("learningpathitem", res, error.message);
+  }
+}
+
+/**
+ * PUT /api/learning-paths/:pathId/categories/:categoryId/items/reorder
+ * Sắp xếp lại thứ tự các items (readings + games) trong category theo thứ tự chỉ định
+ */
+async function reorderItemsInCategory(req, res) {
+  try {
+    const pathId = parseInt(req.params.pathId);
+    const categoryId = parseInt(req.params.categoryId);
+    
+    if (isNaN(pathId) || isNaN(categoryId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path or category ID");
+    }
+
+    const { readingOrders } = req.body;
+
+    // Validate input
+    if (!readingOrders || !Array.isArray(readingOrders) || readingOrders.length === 0) {
+      return messageManager.validationFailed("learningpathitem", res, "Reading orders are required");
+    }
+
+    // Validate each order item
+    const invalidItems = readingOrders.filter(item => 
+      item.sequence_order == null ||
+      isNaN(parseInt(item.sequence_order)) ||
+      (!item.reading_id && !item.game_id) ||
+      (item.reading_id && item.game_id) ||
+      (item.reading_id && isNaN(parseInt(item.reading_id))) ||
+      (item.game_id && isNaN(parseInt(item.game_id)))
+    );
+
+    if (invalidItems.length > 0) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid item order data. Each item must have either reading_id or game_id (not both)");
+    }
+
+    // Create transaction for the entire operation
+    const transaction = await db.sequelize.transaction();
+    
+    try {
+      // Find category item
+      const categoryItemRepository = require('../repositories/LearningPathCategoryItem.repository.js');
+      const categoryItem = await categoryItemRepository.findByCategoryAndPath(pathId, categoryId);
+      
+      if (!categoryItem) {
+        await transaction.rollback();
+        return messageManager.notFound("learningpathcategory", res, "Category not found in learning path");
+      }
+
+      // Reorder items in category
+      const learningPathItemRepository = require('../repositories/LearningPathItem.repository.js');
+      const result = await learningPathItemRepository.reorderItemsInCategory(
+        categoryItem.id, 
+        readingOrders,
+        transaction
+      );
+
+      // Commit transaction
+      await transaction.commit();
+
+      return messageManager.updateSuccess("learningpathitem", {
+        updated_items: result
+      }, res, "Items reordered successfully");
+
+    } catch (error) {
+      // Rollback transaction on error
+      await transaction.rollback();
+      console.error("Reorder items error:", error);
+      
+      if (error.message.includes('do not belong to this category')) {
+        return messageManager.validationFailed("learningpathitem", res, error.message);
+      }
+      
+      return messageManager.updateFailed("learningpathitem", res, error.message);
+    }
+
+  } catch (error) {
+    console.error("Reorder items controller error:", error);
+    return messageManager.updateFailed("learningpathitem", res, error.message);
+  }
+}
+
+/**
+ * DELETE /api/learning-paths/:pathId/readings/:readingId
+ * Xóa reading khỏi learning path và xóa tất cả games phụ thuộc
+ */
+async function deleteReadingFromPath(req, res) {
+  try {
+    const pathId = parseInt(req.params.pathId);
+    const readingId = parseInt(req.params.readingId);
+
+    if (isNaN(pathId) || isNaN(readingId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path or reading ID");
+    }
+
+    // Create transaction for the entire operation
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      // Verify learning path exists
+      const learningPath = await db.LearningPath.findByPk(pathId, { transaction });
+      if (!learningPath) {
+        await transaction.rollback();
+        return messageManager.notFound("learningpath", res, "Learning path not found");
+      }
+
+      // Delete reading and dependent games
+      const learningPathItemRepository = require('../repositories/LearningPathItem.repository.js');
+      const result = await learningPathItemRepository.deleteReadingFromPath(
+        pathId, 
+        readingId, 
+        transaction
+      );
+
+      // Commit transaction
+      await transaction.commit();
+
+      return messageManager.deleteSuccess("learningpathitem", {
+        deleted_reading_id: result.deleted_reading_id,
+        deleted_dependent_games: result.deleted_dependent_games,
+        reordered_items_count: result.reordered_items_count,
+        category_id: result.category_id
+      }, res, `Reading deleted successfully. ${result.deleted_dependent_games.length} dependent games were also removed.`);
+
+    } catch (error) {
+      // Rollback transaction on error
+      await transaction.rollback();
+      console.error("Delete reading error:", error);
+
+      if (error.message === 'Reading not found in this learning path') {
+        return messageManager.notFound("learningpathitem", res, error.message);
+      }
+
+      return messageManager.deleteFailed("learningpathitem", res, error.message);
+    }
+
+  } catch (error) {
+    console.error("Delete reading controller error:", error);
+    return messageManager.deleteFailed("learningpathitem", res, error.message);
+  }
+}
+
+/**
+ * DELETE /api/learning-paths/:pathId/games/:gameId
+ * Xóa game khỏi learning path
+ */
+async function deleteGameFromPath(req, res) {
+  try {
+    const pathId = parseInt(req.params.pathId);
+    const gameId = parseInt(req.params.gameId);
+
+    if (isNaN(pathId) || isNaN(gameId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path or game ID");
+    }
+
+    // Create transaction for the entire operation
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      // Verify learning path exists
+      const learningPath = await db.LearningPath.findByPk(pathId, { transaction });
+      if (!learningPath) {
+        await transaction.rollback();
+        return messageManager.notFound("learningpath", res, "Learning path not found");
+      }
+
+      // Delete game
+      const learningPathItemRepository = require('../repositories/LearningPathItem.repository.js');
+      const result = await learningPathItemRepository.deleteGameFromPath(
+        pathId, 
+        gameId, 
+        transaction
+      );
+
+      // Commit transaction
+      await transaction.commit();
+
+      return messageManager.deleteSuccess("learningpathitem", {
+        deleted_game_id: result.deleted_game_id,
+        reordered_items_count: result.reordered_items_count,
+        category_id: result.category_id
+      }, res, "Game deleted successfully");
+
+    } catch (error) {
+      // Rollback transaction on error
+      await transaction.rollback();
+      console.error("Delete game error:", error);
+
+      if (error.message === 'Game not found in this learning path') {
+        return messageManager.notFound("learningpathitem", res, error.message);
+      }
+
+      return messageManager.deleteFailed("learningpathitem", res, error.message);
+    }
+
+  } catch (error) {
+    console.error("Delete game controller error:", error);
+    return messageManager.deleteFailed("learningpathitem", res, error.message);
+  }
+}
+
+/**
+ * GET /api/learning-paths/:pathId/categories
+ * Lấy danh sách categories có trong learning path với điều kiện có ít nhất 1 item
+ */
+async function getCategoriesInLearningPath(req, res) {
+  try {
+    const pathId = parseInt(req.params.pathId);
+    
+    if (isNaN(pathId)) {
+      return messageManager.validationFailed("learningpath", res, "Invalid learning path");
+    }
+
+    // Verify learning path exists
+    const learningPath = await db.LearningPath.findByPk(pathId, {
+      attributes: ['id', 'name']
+    });
+    
+    if (!learningPath) {
+      return messageManager.notFound("learningpath", res, "Learning path not found");
+    }
+
+    // Get categories with items
+    const categories = await repository.findCategoriesInLearningPath(pathId);
+    
+    const responseData = {
+      learning_path: {
+        id: learningPath.id,
+        name: learningPath.name
+      },
+      categories: categories,
+      total_categories: categories.length
+    };
+
+    return messageManager.fetchSuccess("learningpathcategory", responseData, res);
+
+  } catch (error) {
+    console.error("Get categories in learning path error:", error);
+    return messageManager.fetchFailed("learningpathcategory", res, error.message);
+  }
+}
+
+/**
+ * GET /api/learning-paths/:pathId/categories/:categoryId/:studentId/items
+ * Lấy danh sách items (readings + games) trong một category cụ thể của learning path với tiến độ học tập của học sinh
+ */
+async function getItemsInCategory(req, res) {
+  try {
+    const pathId = parseInt(req.params.pathId);
+    const categoryId = parseInt(req.params.categoryId);
+    const studentId = parseInt(req.params.studentId);
+
+    if (isNaN(pathId) || isNaN(categoryId) || isNaN(studentId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path, category or student ID");
+    }
+
+    // Verify learning path exists
+    const learningPath = await db.LearningPath.findByPk(pathId, {
+      attributes: ['id', 'name']
+    });
+    
+    if (!learningPath) {
+      return messageManager.notFound("learningpath", res, "Learning path not found");
+    }
+
+    // Verify student exists
+    const student = await db.KidStudent.findByPk(studentId, {
+      attributes: ['id', 'name']
+    });
+    
+    if (!student) {
+      return messageManager.notFound("kidstudent", res, "Student not found");
+    }
+
+    // Get items in category with student progress
+    const result = await repository.findItemsInCategory(pathId, categoryId, studentId);
+    
+    if (!result) {
+      return messageManager.notFound("learningpathcategory", res, "Category not found in learning path or category has no items");
+    }
+
+    const responseData = {
+      items: result.items,
+      total_items: result.total_items
+    };
+
+    return messageManager.fetchSuccess("learningpathitem", responseData, res);
+
+  } catch (error) {
+    console.error("Get items in category error:", error);
+    return messageManager.fetchFailed("learningpathitem", res, error.message);
+  }
+}
+
 module.exports = {
   getAllLearningPaths,
   toggleStatus,
   createLearningPath,
-  updateLearningPath
+  updateLearningPath,
+  getItemsInLearningPath,
+  addItemsToLearningPath,
+  reorderCategories,
+  reorderItemsInCategory,
+  deleteReadingFromPath,
+  deleteGameFromPath,
+  getCategoriesInLearningPath,
+  getItemsInCategory
 };
