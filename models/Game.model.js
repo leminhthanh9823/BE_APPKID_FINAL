@@ -46,7 +46,7 @@ module.exports = (sequelize, DataTypes) => {
     // Has many learning path items
     Game.hasMany(models.LearningPathItem, {
       foreignKey: 'game_id',
-      as: 'learningPathItems'
+      as: 'learning_path_items'
     });
     
     // Belongs to prerequisite reading
