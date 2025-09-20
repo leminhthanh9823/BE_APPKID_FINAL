@@ -135,7 +135,7 @@ class GameController {
 
     try {
       const { id } = req.params;
-      const { name, description, type, is_active } = req.body;
+      const { name, description, type, isActive } = req.body;
 
       const validationError = validateGameData({ name, description, type }, true);
       if (validationError) {
@@ -161,7 +161,7 @@ class GameController {
       }
 
       const updateData = sanitizeGameData({ 
-        name, description, type, is_active, 
+        name, description, type, is_active: isActive 
       });
 
       Object.keys(updateData).forEach(key => {
