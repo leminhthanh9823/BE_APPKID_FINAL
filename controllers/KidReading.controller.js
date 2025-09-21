@@ -188,16 +188,23 @@ async function getById(req, res) {
       include: [
         {
           model: db.ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["id", "title", "description", "image"],
-          through: { attributes: [] },
         },
       ],
     });
     if (!data) {
       return messageManager.notFound("kidreading", res);
     }
-    return messageManager.fetchSuccess("kidreading", data, res);
+    
+    // Transform data to maintain backward compatibility
+    const transformedData = {
+      ...data.toJSON(),
+      categories: data.category ? [data.category] : [],
+      category: data.category || null
+    };
+    
+    return messageManager.fetchSuccess("kidreading", transformedData, res);
   } catch (error) {
   return messageManager.fetchFailed("kidreading", res);
   }
@@ -209,9 +216,8 @@ async function getByGrade(req, res) {
       include: [
         {
           model: db.ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["id", "title", "description", "image"],
-          through: { attributes: [] },
         },
       ],
       order: [["created_at", "DESC"]],
@@ -223,8 +229,8 @@ async function getByGrade(req, res) {
         is_active: readingData.is_active,
         created_at: formatDateToYYYYMMDD(readingData.created_at),
         updated_at: formatDateToYYYYMMDD(readingData.updated_at),
-        categories: readingData.categories || [],
-        category: readingData.categories?.[0] || null,
+        categories: readingData.category ? [readingData.category] : [],
+        category: readingData.category || null,
       };
     });
   return messageManager.fetchSuccess("kidreading", transformedData, res);
@@ -484,9 +490,8 @@ async function getKidReadingByCategory(req, res) {
     }
     let includeCategories = {
       model: db.ReadingCategory,
-      as: "categories",
+      as: "category",
       attributes: ["id", "title", "description", "image"],
-      through: { attributes: [] },
     };
     const { rows, count: total } = await db.KidReading.findAndCountAll({
       where: {
@@ -507,23 +512,23 @@ async function getKidReadingByCategory(req, res) {
         include: [
           {
             model: db.ReadingCategory,
-            as: "categories",
+            as: "category",
             attributes: ["id", "title", "description", "image"],
-            through: { attributes: [] },
           },
         ],
       });
     }
     const transformedRecords = fullReadings.map((reading) => {
       const readingData = reading.toJSON ? reading.toJSON() : { ...reading };
-      const categories = readingData.categories || [];
+      const category = readingData.category || null;
+      const categories = category ? [category] : [];
       return {
         ...readingData,
         is_active: readingData.is_active,
         created_at: formatDateToYYYYMMDD(readingData.created_at),
         updated_at: formatDateToYYYYMMDD(readingData.updated_at),
         categories: categories,
-        category: categories?.[0] || null,
+        category: category,
         categories_names: categories.map((cat) => cat.title).join(", "),
       };
     });

@@ -82,9 +82,8 @@ class KidReadingRepository {
       include: [
         {
           model: db.ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["id", "title", "description", "image"],
-          through: { attributes: [] },
         },
       ],
       offset,
@@ -112,9 +111,8 @@ class KidReadingRepository {
       include: [
         {
           model: ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["id", "title", "description", "image"],
-          through: { attributes: [] },
           where: {
             id: categoryId,
           },
@@ -169,8 +167,8 @@ class KidReadingRepository {
         total_complete_quiz: bestScore,
         max_achieved_stars:
           totalQuestions > 0 ? (bestScore / totalQuestions) * 5 : 0,
-        categories: reading.categories || [],
-        category: reading.categories?.[0] || null,
+        categories: reading.category ? [reading.category] : [],
+        category: reading.category || null,
       };
     });
     return result;
@@ -274,9 +272,8 @@ class KidReadingRepository {
     return this.withRetry(async () => {
       let includeCategories = {
         model: db.ReadingCategory,
-        as: "categories",
+        as: "category",
         attributes: ["id", "title", "description", "image"],
-        through: { attributes: [] },
       };
       if (category_ids && category_ids.length > 0) {
         includeCategories.where = {
@@ -301,19 +298,19 @@ class KidReadingRepository {
           include: [
             {
               model: db.ReadingCategory,
-              as: "categories",
+              as: "category",
               attributes: ["id", "title", "description", "image"],
-              through: { attributes: [] },
             },
           ],
         });
       }
       result.rows = fullReadings.map((reading) => {
         const readingData = reading.get ? reading.get({ plain: true }) : reading;
-        const categories = readingData.categories || [];
+        const category = readingData.category || null;
         return {
           ...readingData,
-          categories
+          category,
+          categories: category ? [category] : [] // Convert single category to array for backward compatibility
         };
       });
       return result;
@@ -327,9 +324,8 @@ class KidReadingRepository {
       include: [
         {
           model: db.ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["grade_id"],
-          through: { attributes: [] },
           required: true,
         },
       ],
@@ -337,10 +333,10 @@ class KidReadingRepository {
     // Gom nhóm theo grade_id
     const countByGrade = {};
     readings.forEach((reading) => {
-      reading.categories.forEach((cat) => {
-        if (!countByGrade[cat.grade_id]) countByGrade[cat.grade_id] = 0;
-        countByGrade[cat.grade_id]++;
-      });
+      if (reading.category) {
+        if (!countByGrade[reading.category.grade_id]) countByGrade[reading.category.grade_id] = 0;
+        countByGrade[reading.category.grade_id]++;
+      }
     });
     return Object.entries(countByGrade).map(([grade_id, count]) => ({
       grade_id,
@@ -362,9 +358,8 @@ class KidReadingRepository {
       include: [
         {
           model: ReadingCategory,
-          as: "categories",
+          as: "category",
           attributes: ["id", "title", "description", "image"],
-          through: { attributes: [] },
         },
       ],
       order: [["created_at", "DESC"]],
@@ -373,8 +368,8 @@ class KidReadingRepository {
       const plain = reading.get({ plain: true });
       return {
         ...plain,
-        categories: plain.categories || [],
-        category: plain.categories?.[0] || null,
+        categories: plain.category ? [plain.category] : [],
+        category: plain.category || null,
       };
     });
   }
