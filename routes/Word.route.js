@@ -67,4 +67,9 @@ router.get('/game/:gameId/words',
   WordController.getWordsByGame
 );
 
+router.get('/mobile/game/:gameId/words',
+  jwtMiddleware,
+  WordController.getWordsByGameMobile
+);
+
 module.exports = router;

@@ -299,6 +299,23 @@ async function getWordsByGame(req, res) {
     return messageManager.fetchFailed('word', res, error.message);
   }
 }
+async function getWordsByGameMobile(req, res) {
+  try {
+    const { gameId } = req.params;
+
+    const result = await wordRepository.getWordsByGame(gameId, {
+      page: 1,
+      limit: 10000,
+      searchTerm: ''
+    });
+
+    // Return just the words array for mobile
+    return messageManager.fetchSuccess('word', result.words, res);
+  } catch (error) {
+    console.error('Error in getWordsByGameMobile:', error);
+    return messageManager.fetchFailed('word', res, error.message);
+  }
+}
 
 async function downloadTemplate(req, res) {
   try {
@@ -368,5 +385,6 @@ module.exports = {
   removeWordsFromGame,
   getWordsByGame,
   downloadTemplate,
-  importFromExcel
+  importFromExcel,
+  getWordsByGameMobile
 };
