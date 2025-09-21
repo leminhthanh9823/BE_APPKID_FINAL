@@ -135,24 +135,38 @@ async function createWord(req, res) {
 
 async function updateWord(req, res) {
   try {
+    console.log('updateWord - Request body:', JSON.stringify(req.body, null, 2));
+    console.log('updateWord - Request params:', req.params);
+    console.log('updateWord - Request file:', req.file ? 'File present' : 'No file');
+    
     const validationError = validateWordData(req.body, true);
     if (validationError) {
+      console.log('updateWord - Validation error:', validationError);
       return messageManager.validationFailed('word', res, validationError);
     }
 
     const sanitizedData = sanitizeWordData(req.body);
+    console.log('updateWord - Sanitized data:', JSON.stringify(sanitizedData, null, 2));
     const wordId = req.params.id;
 
     // Validate any uploaded files
     if (req.file) {
       if (!req.file.mimetype.startsWith('image/')) {
+        console.log('updateWord - Invalid file type:', req.file.mimetype);
         return messageManager.validationFailed('word', res, 'Invalid file type. Please upload an image file');
       }
     }
 
-    const existingWord = await wordRepository.findByWordText(sanitizedData.word);
-    if (existingWord && existingWord.id !== parseInt(wordId)) {
-      return messageManager.validationFailed('word', res, 'Word already exists');
+    // Only check for duplicates if word text is being updated
+    if (sanitizedData.word) {
+      const existingWord = await wordRepository.findByWordText(sanitizedData.word);
+      console.log('updateWord - Existing word found:', existingWord ? `ID: ${existingWord.id}, type: ${typeof existingWord.id}` : 'None');
+      console.log('updateWord - Current word ID:', parseInt(wordId), ', type:', typeof parseInt(wordId));
+      console.log('updateWord - Comparison result:', existingWord ? existingWord.id !== parseInt(wordId) : 'N/A');
+      if (existingWord && parseInt(existingWord.id) !== parseInt(wordId)) {
+        console.log('updateWord - Word already exists:', sanitizedData.word);
+        return messageManager.validationFailed('word', res, 'Word already exists');
+      }
     }
 
     // Upload new image if provided

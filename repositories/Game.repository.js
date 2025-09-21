@@ -24,9 +24,11 @@ class GameRepository {
   }
 
   async createGame(gameData, readingId, transaction) {
+    // 1. Get max sequence_order in games table for this reading
     const maxOrder = await this.getMaxSequenceOrder(readingId);
     const sequenceOrder = maxOrder + 1;
 
+    // 2. Create game in games table
     const game = await Game.create({
       ...gameData,
       prerequisite_reading_id: readingId,
@@ -34,6 +36,47 @@ class GameRepository {
       is_active: false
     }, { transaction });
 
+    // 3. Find learning_path_items that contain this reading to add game to same categories
+    const learningPathItemsWithReading = await sequelize.query(`
+      SELECT DISTINCT learning_path_category_id 
+      FROM learning_path_items 
+      WHERE reading_id = ${readingId}
+    `, {
+      type: sequelize.QueryTypes.SELECT,
+      raw: true,
+      transaction
+    });
+
+    // 4. For each category, add this game with max sequence_order + 1
+    for (const categoryItem of learningPathItemsWithReading) {
+      const categoryId = categoryItem.learning_path_category_id;
+      
+      // Get max sequence_order in this category
+      const maxCategoryOrder = await sequelize.query(`
+        SELECT MAX(sequence_order) as maxOrder 
+        FROM learning_path_items 
+        WHERE learning_path_category_id = ${categoryId}
+      `, {
+        type: sequelize.QueryTypes.SELECT,
+        raw: true,
+        transaction
+      });
+
+      const maxOrderInCategory = maxCategoryOrder[0]?.maxOrder || 0;
+      const newSequenceOrderInCategory = maxOrderInCategory + 1;
+
+      // Create learning_path_item for this game
+      await sequelize.query(`
+        INSERT INTO learning_path_items 
+        (learning_path_category_id, game_id, sequence_order, is_active, created_at, updated_at)
+        VALUES (${categoryId}, ${game.id}, ${newSequenceOrderInCategory}, 1, NOW(), NOW())
+      `, {
+        type: sequelize.QueryTypes.INSERT,
+        transaction
+      });
+    }
+
+    // 5. Return created game with relations
     const createdGame = await Game.findByPk(game.id, {
       include: [{
         model: sequelize.models.KidReading,
@@ -109,7 +152,14 @@ class GameRepository {
         };
       }
 
+      // Delete related GameWords
       await GameWord.destroy({
+        where: { game_id: id },
+        transaction
+      });
+      
+      // Delete related LearningPathItems
+      await sequelize.models.LearningPathItem.destroy({
         where: { game_id: id },
         transaction
       });
@@ -168,63 +218,208 @@ class GameRepository {
       whereConditions.type = type;
     }
 
-    const { rows: games, count } = await Game.findAndCountAll({
-      where: whereConditions,
-      include: [
-        {
-          model: sequelize.models.KidReading,
-          as: 'prerequisiteReading',
-          attributes: ['id', 'title']
-        }
-      ],
-      attributes: {
-        include: [
-          [
-            sequelize.literal(`(
-              SELECT COUNT(DISTINCT sr.kid_student_id)
-              FROM student_readings sr
-              WHERE sr.kid_reading_id = games.prerequisite_reading_id
-              AND sr.is_completed = 1
-            )`),
-            'studentCompletionCount'
-          ],
-          [
-            sequelize.literal(`(
-              SELECT COUNT(gw.id)
-              FROM game_words gw
-              WHERE gw.game_id = games.id
-            )`),
-            'wordCount'
-          ]
-        ]
-      },
-      order: [['sequence_order', 'ASC']],
-      limit: parseInt(limit),
-      offset: (page - 1) * parseInt(limit),
-      distinct: true
-    });
-
-    return {
-      games,
-      pagination: {
-        total: count,
-        totalPages: Math.ceil(count / limit),
-        currentPage: parseInt(page),
-        limit: parseInt(limit)
+      // ULTRA FAST MODE: Skip heavy calculations if enabled
+      const ULTRA_FAST_MODE = process.env.ULTRA_FAST_MODE === 'true';
+      
+      if (ULTRA_FAST_MODE) {
+        const simpleQuery = `
+          SELECT 
+            g.id, g.name, g.description, g.type, g.image, 
+            g.sequence_order, g.is_active, g.created_at, g.updated_at,
+            kr.id as reading_id, kr.title as reading_title
+          FROM games g
+          LEFT JOIN kid_readings kr ON g.prerequisite_reading_id = kr.id
+          WHERE g.prerequisite_reading_id = ${parseInt(readingId)}
+          ORDER BY g.sequence_order ASC
+          LIMIT ${parseInt(limit)} OFFSET ${(page - 1) * parseInt(limit)}
+        `;
+        
+        const countQuery = `SELECT COUNT(*) as total FROM games WHERE prerequisite_reading_id = ${parseInt(readingId)}`;
+        
+        const [gamesResult, countResult] = await Promise.all([
+          sequelize.query(simpleQuery, { type: sequelize.QueryTypes.SELECT, raw: true }),
+          sequelize.query(countQuery, { type: sequelize.QueryTypes.SELECT, raw: true })
+        ]);
+        
+        const games = gamesResult.map(game => ({
+          id: game.id,
+          name: game.name,
+          description: game.description,
+          type: game.type,
+          image: game.image,
+          sequence_order: game.sequence_order,
+          is_active: game.is_active,
+          created_at: game.created_at,
+          updated_at: game.updated_at,
+          studentCompletionCount: 0, // Skip heavy calculation
+          wordCount: 0, // Skip heavy calculation
+          prerequisiteReading: game.reading_id ? {
+            id: game.reading_id,
+            title: game.reading_title
+          } : null
+        }));
+        
+        return {
+          games,
+          pagination: {
+            total: parseInt(countResult[0].total),
+            totalPages: Math.ceil(countResult[0].total / limit),
+            currentPage: parseInt(page),
+            limit: parseInt(limit)
+          }
+        };
       }
-    };
+
+      // OPTIMIZED: Use single raw query instead of complex Sequelize query with subqueries
+      const offset = (page - 1) * parseInt(limit);    try {
+      // Build WHERE clause for raw query
+      let whereClause = `g.prerequisite_reading_id = ${parseInt(readingId)}`;
+      
+      if (searchTerm) {
+        const searchEscaped = searchTerm.replace(/'/g, "''");
+        whereClause += ` AND (g.name LIKE '%${searchEscaped}%' OR g.description LIKE '%${searchEscaped}%')`;
+      }
+      
+      if (status === 'active') {
+        whereClause += ` AND g.is_active = 1`;
+      } else if (status === 'inactive') {
+        whereClause += ` AND g.is_active = 0`;
+      }
+      
+      if (type !== null && type !== undefined) {
+        whereClause += ` AND g.type = ${parseInt(type)}`;
+      }
+      
+      // Single optimized query with LEFT JOINs instead of subqueries
+      const gamesQuery = `
+        SELECT 
+          g.id,
+          g.name,
+          g.description,
+          g.type,
+          g.image,
+          g.sequence_order,
+          g.is_active,
+          g.created_at,
+          g.updated_at,
+          kr.id as reading_id,
+          kr.title as reading_title,
+          COALESCE(sc.student_count, 0) as studentCompletionCount,
+          COALESCE(wc.word_count, 0) as wordCount
+        FROM games g
+        LEFT JOIN kid_readings kr ON g.prerequisite_reading_id = kr.id
+        LEFT JOIN (
+          SELECT 
+            sr.kid_reading_id,
+            COUNT(DISTINCT sr.kid_student_id) as student_count
+          FROM student_readings sr 
+          WHERE sr.is_completed = 1
+          GROUP BY sr.kid_reading_id
+        ) sc ON sc.kid_reading_id = g.prerequisite_reading_id
+        LEFT JOIN (
+          SELECT 
+            gw.game_id,
+            COUNT(gw.id) as word_count
+          FROM game_words gw
+          GROUP BY gw.game_id
+        ) wc ON wc.game_id = g.id
+        WHERE ${whereClause}
+        ORDER BY g.sequence_order ASC
+        LIMIT ${parseInt(limit)} OFFSET ${offset}
+      `;
+
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM games g
+        WHERE ${whereClause}
+      `;
+      
+      // Execute both queries in parallel
+      const [gamesResult, countResult] = await Promise.all([
+        sequelize.query(gamesQuery, { 
+          type: sequelize.QueryTypes.SELECT,
+          raw: true
+        }),
+        sequelize.query(countQuery, { 
+          type: sequelize.QueryTypes.SELECT,
+          raw: true
+        })
+      ]);
+
+      // Transform results to match expected format
+      const games = gamesResult.map(game => ({
+        id: game.id,
+        name: game.name,
+        description: game.description,
+        type: game.type,
+        image: game.image,
+        sequence_order: game.sequence_order,
+        is_active: game.is_active,
+        created_at: game.created_at,
+        updated_at: game.updated_at,
+        studentCompletionCount: parseInt(game.studentCompletionCount) || 0,
+        wordCount: parseInt(game.wordCount) || 0,
+        prerequisiteReading: game.reading_id ? {
+          id: game.reading_id,
+          title: game.reading_title
+        } : null
+      }));
+
+      const total = countResult[0].total;
+      
+      return {
+        games,
+        pagination: {
+          total: parseInt(total),
+          totalPages: Math.ceil(total / limit),
+          currentPage: parseInt(page),
+          limit: parseInt(limit)
+        }
+      };
+
+    } catch (error) {
+      console.error('Optimized query failed, falling back to Sequelize:', error);
+      
+      // Fallback to original Sequelize query without heavy subqueries
+      const { rows: games, count } = await Game.findAndCountAll({
+        where: whereConditions,
+        include: [
+          {
+            model: sequelize.models.KidReading,
+            as: 'prerequisiteReading',
+            attributes: ['id', 'title']
+          }
+        ],
+        // Remove heavy subqueries for fallback
+        order: [['sequence_order', 'ASC']],
+        limit: parseInt(limit),
+        offset: (page - 1) * parseInt(limit),
+        distinct: true
+      });
+
+      return {
+        games: games.map(game => ({
+          ...game.toJSON(),
+          studentCompletionCount: 0, // Skip heavy calculation in fallback
+          wordCount: 0 // Skip heavy calculation in fallback
+        })),
+        pagination: {
+          total: count,
+          totalPages: Math.ceil(count / limit),
+          currentPage: parseInt(page),
+          limit: parseInt(limit)
+        }
+      };
+    }
   }
 
 
 
   async reorderGames(games) {
     // PERFORMANCE OPTIMIZATION: Skip database update if enabled for testing
-    // This demonstrates the application-level optimizations achieved
-    // Network latency to external DB server (engkid.io.vn) is the main bottleneck
     const SKIP_DB_FOR_TESTING = process.env.NODE_ENV === 'development' && process.env.SKIP_DB_REORDER === 'true';
     
     if (SKIP_DB_FOR_TESTING) {
-      // Simulate minimal processing time
       await new Promise(resolve => setTimeout(resolve, 2));
       
       return {
@@ -233,50 +428,184 @@ class GameRepository {
       };
     }
 
-    // Ultra-optimized approach: Use Sequelize raw query with minimal overhead
+    // Update both games table and learning_path_items table
+    const transaction = await sequelize.transaction();
+    
     try {
       const gameIds = games.map(g => parseInt(g.id));
-      const caseWhenClause = games.map(g => 
+      
+      // 1. Update games.sequence_order (thứ tự trong reading)
+      const gamesCaseWhenClause = games.map(g => 
         `WHEN ${parseInt(g.id)} THEN ${parseInt(g.sequence_order)}`
       ).join(' ');
       
-      // Single optimized query with Sequelize connection pool
       await sequelize.query(`
         UPDATE games 
         SET sequence_order = CASE id 
-          ${caseWhenClause}
+          ${gamesCaseWhenClause}
           ELSE sequence_order 
         END
         WHERE id IN (${gameIds.join(',')})
       `, { 
         type: sequelize.QueryTypes.UPDATE,
-        logging: false,
-        raw: true
+        raw: true,
+        transaction
       });
 
+      // 2. Update learning_path_items.sequence_order (thứ tự trong learning path)
+      // Get current learning_path_items for these games
+      const currentLearningPathItems = await sequelize.query(`
+        SELECT id, game_id, learning_path_category_id, sequence_order 
+        FROM learning_path_items 
+        WHERE game_id IN (${gameIds.join(',')})
+        ORDER BY learning_path_category_id, sequence_order
+      `, { 
+        type: sequelize.QueryTypes.SELECT,
+        raw: true,
+        transaction
+      });
+      
+      if (currentLearningPathItems.length > 0) {
+        // Group by learning_path_category_id
+        const categoriesMap = {};
+        currentLearningPathItems.forEach(item => {
+          if (!categoriesMap[item.learning_path_category_id]) {
+            categoriesMap[item.learning_path_category_id] = [];
+          }
+          categoriesMap[item.learning_path_category_id].push(item);
+        });
+        
+        // Create mapping of old game sequence to new game sequence
+        const gameSequenceMap = {};
+        games.forEach(g => {
+          gameSequenceMap[parseInt(g.id)] = parseInt(g.sequence_order);
+        });
+        
+        // Update each category
+        for (const categoryId of Object.keys(categoriesMap)) {
+          const itemsInCategory = categoriesMap[categoryId];
+          
+          // Sort items by new game sequence order to get the correct order
+          const sortedItems = [...itemsInCategory].sort((a, b) => {
+            const seqA = gameSequenceMap[a.game_id] || a.sequence_order;
+            const seqB = gameSequenceMap[b.game_id] || b.sequence_order;
+            return seqA - seqB;
+          });
+          
+          // Get all existing sequence_orders in this category (preserve the range)
+          const existingSequenceOrders = itemsInCategory
+            .map(item => item.sequence_order)
+            .sort((a, b) => a - b);
+          
+          // Assign existing sequence orders to items in new sorted order
+          for (let i = 0; i < sortedItems.length; i++) {
+            const item = sortedItems[i];
+            const newSequenceOrder = existingSequenceOrders[i];
+            
+            if (item.sequence_order !== newSequenceOrder) {
+              await sequelize.query(`
+                UPDATE learning_path_items 
+                SET sequence_order = ${newSequenceOrder}
+                WHERE id = ${item.id}
+              `, { 
+                type: sequelize.QueryTypes.UPDATE,
+                raw: true,
+                transaction
+              });
+            }
+          }
+        }
+      }
+
+      await transaction.commit();
+
       return {
-        message: `Successfully reordered ${games.length} games`,
+        message: `Successfully reordered ${games.length} games and updated learning path items`,
         totalUpdated: games.length
       };
       
     } catch (error) {
-      // Ultra-simple fallback: Use Sequelize update without any optimization
-      for (const gameData of games) {
-        await Game.update(
-          { sequence_order: parseInt(gameData.sequence_order) },
-          { 
-            where: { id: parseInt(gameData.id) },
-            logging: false,
-            hooks: false,
-            validate: false
+      console.error('Error in reorderGames:', error);
+      await transaction.rollback();
+      
+      // Fallback method
+      const fallbackTransaction = await sequelize.transaction();
+      try {
+        // Update games table
+        for (const gameData of games) {
+          await Game.update(
+            { sequence_order: parseInt(gameData.sequence_order) },
+            { 
+              where: { id: parseInt(gameData.id) },
+              hooks: false,
+              validate: false,
+              transaction: fallbackTransaction
+            }
+          );
+        }
+        
+        // Update learning_path_items table
+        const gameIds = games.map(g => parseInt(g.id));
+        const currentItems = await sequelize.models.LearningPathItem.findAll({
+          where: { game_id: gameIds },
+          transaction: fallbackTransaction
+        });
+        
+        const gameSequenceMap = {};
+        games.forEach(g => {
+          gameSequenceMap[parseInt(g.id)] = parseInt(g.sequence_order);
+        });
+        
+        // Group items by category for fallback method too
+        const categoriesMap = {};
+        currentItems.forEach(item => {
+          if (!categoriesMap[item.learning_path_category_id]) {
+            categoriesMap[item.learning_path_category_id] = [];
           }
-        );
-      }
+          categoriesMap[item.learning_path_category_id].push(item);
+        });
+        
+        // Update each category preserving sequence order range
+        for (const categoryId of Object.keys(categoriesMap)) {
+          const itemsInCategory = categoriesMap[categoryId];
+          
+          // Sort by new game sequence order
+          const sortedItems = [...itemsInCategory].sort((a, b) => {
+            const seqA = gameSequenceMap[a.game_id] || a.sequence_order;
+            const seqB = gameSequenceMap[b.game_id] || b.sequence_order;
+            return seqA - seqB;
+          });
+          
+          // Get existing sequence orders in this category
+          const existingSequenceOrders = itemsInCategory
+            .map(item => item.sequence_order)
+            .sort((a, b) => a - b);
+          
+          // Reassign sequence orders
+          for (let i = 0; i < sortedItems.length; i++) {
+            const item = sortedItems[i];
+            const newSequenceOrder = existingSequenceOrders[i];
+            
+            if (item.sequence_order !== newSequenceOrder) {
+              await item.update(
+                { sequence_order: newSequenceOrder },
+                { transaction: fallbackTransaction }
+              );
+            }
+          }
+        }
 
-      return {
-        message: `Successfully reordered ${games.length} games`,
-        totalUpdated: games.length
-      };
+        await fallbackTransaction.commit();
+
+        return {
+          message: `Successfully reordered ${games.length} games and updated learning path items (fallback method)`,
+          totalUpdated: games.length
+        };
+      } catch (fallbackError) {
+        console.error('Fallback error:', fallbackError);
+        await fallbackTransaction.rollback();
+        throw fallbackError;
+      }
     }
   }
 }

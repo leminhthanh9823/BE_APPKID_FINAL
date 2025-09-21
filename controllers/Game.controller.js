@@ -86,9 +86,21 @@ class GameController {
         type = null
       } = req.query;
 
-      const reading = await sequelize.models.KidReading.findByPk(readingId);
-      if (!reading) {
-        return messageManager.notFound('reading', res);
+      // OPTIMIZATION: Skip reading validation if SKIP_READING_CHECK is enabled
+      const SKIP_READING_CHECK = process.env.SKIP_READING_CHECK === 'true';
+      
+      if (!SKIP_READING_CHECK) {
+        // Use simple existence check instead of full object fetch
+        const readingExists = await sequelize.query(`
+          SELECT 1 FROM kid_readings WHERE id = ${parseInt(readingId)} LIMIT 1
+        `, {
+          type: sequelize.QueryTypes.SELECT,
+          raw: true
+        });
+        
+        if (!readingExists || readingExists.length === 0) {
+          return messageManager.notFound('reading', res);
+        }
       }
 
       const result = await gameRepository.listGames(readingId, {
@@ -98,7 +110,7 @@ class GameController {
         status,
         type: type !== null ? parseInt(type) : null
       });
-
+      
       return messageManager.fetchSuccess('game', result, res);
     } catch (error) {
       console.error('List games error:', error);
