@@ -54,10 +54,10 @@ module.exports = (sequelize, DataTypes) => {
   );
   EBook.associate = (models) => {
     EBook.belongsToMany(models.EBookCategory, {
-      through: "EBook_EBookCategory",
+      through: "e_library_categories_relations",
       as: "categories",
-      foreignKey: "ebook_id",
-      otherKey: "category_id",
+      foreignKey: "elibrary_id",
+      otherKey: "elibrary_categories_id",
     });
   };
   return EBook;
