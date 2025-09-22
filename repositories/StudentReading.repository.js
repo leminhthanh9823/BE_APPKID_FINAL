@@ -195,6 +195,38 @@ class StudentReadingRepository {
 
     return reading !== null;
   }
+
+  async saveGameResult(data) {
+    const { kid_student_id, game_id, learning_path_id, is_completed, stars } = data;
+
+    try {
+      // Create a new game result record
+      const gameResult = await StudentReading.create({
+        kid_student_id: kid_student_id,
+        kid_reading_id: game_id, // Using game_id as kid_reading_id for game results
+        is_completed: is_completed ? 1 : 0,
+        is_passed: is_completed ? 1 : 0, // If completed, consider it passed
+        score: is_completed ? 10 : 0, // Default score for completed games
+        star: stars || 5, // Default stars = 5
+        duration: "00:00", // Default duration for games
+        date_reading: new Date(),
+        learning_path_id: learning_path_id, // Store learning path reference if column exists
+      });
+
+      return {
+        id: gameResult.id,
+        kid_student_id: gameResult.kid_student_id,
+        game_id: game_id,
+        learning_path_id: learning_path_id,
+        is_completed: gameResult.is_completed,
+        stars: gameResult.star,
+        date_completed: gameResult.date_reading,
+      };
+    } catch (error) {
+      console.error('Error saving game result:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new StudentReadingRepository();
