@@ -24,4 +24,7 @@ router.get(
   controller.getStudentLearningHistory
 );
 
+router.post("/game-result", jwtMiddleware, controller.saveGameResult);
+
 module.exports = router;
+  Ư
