@@ -11,7 +11,6 @@ const messageManager = require("../helpers/MessageManager.helper.js");
 const getCommonInfor = async (req, res) => {
   try {
     const studentId = req.userId;
-    const gradeId = req.gradeId;
 
     const results = await StudentReading.findAll({
       where: {
@@ -24,7 +23,6 @@ const getCommonInfor = async (req, res) => {
 
     const totalReadings = await KidReading.count({
       where: {
-        grade_id: gradeId,
         is_active: 1,
       },
     });
@@ -54,11 +52,9 @@ const getCommonInfor = async (req, res) => {
 const getReadingList = async (req, res) => {
   try {
     const studentId = req.userId;
-    const gradeId = req.gradeId;
 
     const readings = await KidReading.findAll({
       where: {
-        grade_id: gradeId,
         is_active: 1,
       },
     });

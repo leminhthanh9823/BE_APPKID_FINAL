@@ -8,22 +8,22 @@ const {
 const sanitizeReadingCategoryData = (data) => {
   const sanitized = { ...data };
 
-  if (sanitized.grade_id !== undefined && sanitized.grade_id !== null) {
-    let gradeValue = sanitized.grade_id;
-    if (typeof gradeValue === "object" && gradeValue !== null) {
-      gradeValue =
-        gradeValue.value ||
-        gradeValue.id ||
-        gradeValue.grade_id ||
-        String(gradeValue);
-    }
+  // if (sanitized.grade_id !== undefined && sanitized.grade_id !== null) {
+  //   let gradeValue = sanitized.grade_id;
+  //   if (typeof gradeValue === "object" && gradeValue !== null) {
+  //     gradeValue =
+  //       gradeValue.value ||
+  //       gradeValue.id ||
+  //       gradeValue.grade_id ||
+  //       String(gradeValue);
+  //   }
 
-    sanitized.grade_id = parseInt(gradeValue);
+  //   sanitized.grade_id = parseInt(gradeValue);
 
-    if (isNaN(sanitized.grade_id)) {
-      delete sanitized.grade_id;
-    }
-  }
+  //   if (isNaN(sanitized.grade_id)) {
+  //     delete sanitized.grade_id;
+  //   }
+  // }
 
   if (sanitized.is_active !== undefined) {
     let activeValue = sanitized.is_active;
@@ -57,12 +57,6 @@ const validateReadingCategoryData = (data, isUpdate = false) => {
   }
   if (data.title.length > 255) {
     return "Title must be less than 255 characters";
-  }
-  if (!isUpdate && !data.grade_id) {
-    return "Please select grade";
-  }
-  if (data.grade_id && (isNaN(data.grade_id) || data.grade_id < 1 || data.grade_id > 5)) {
-    return "Please select a valid grade";
   }
   if (data.description && data.description.length > 1000) {
     return "Description must be less than 1000 characters";
@@ -113,21 +107,20 @@ async function getReadingCategoryById(req, res) {
   }
 }
 
-async function getReadingCategoryByGrade(req, res) {
-  try {
-    const grade_id = req.params.grade_id;
-    const data = await repository.findByGrade(grade_id);
-    return messageManager.fetchSuccess("readingcategory", data, res);
-  } catch (error) {
-    return messageManager.fetchFailed("readingcategory", res, error.message);
-  }
-}
+// async function getReadingCategoryByGrade(req, res) {
+//   try {
+//     const data = await repository.findByGrade(grade_id);
+//     return messageManager.fetchSuccess("readingcategory", data, res);
+//   } catch (error) {
+//     return messageManager.fetchFailed("readingcategory", res, error.message);
+//   }
+// }
 
 async function createReadingCategory(req, res) {
   try {
     const sanitizedData = sanitizeReadingCategoryData(req.body);
 
-    const { title, description, grade_id } = sanitizedData;
+    const { title, description } = sanitizedData;
 
     const validationError = validateReadingCategoryData(sanitizedData);
     if (validationError) {
@@ -149,7 +142,6 @@ async function createReadingCategory(req, res) {
     const categoryData = {
       title,
       description,
-      grade_id,
       image: imageUrl,
       created_at: new Date(),
       updated_at: new Date(),
@@ -168,7 +160,7 @@ async function updateReadingCategory(req, res) {
     const id = req.params.id;
     const sanitizedData = sanitizeReadingCategoryData(req.body);
 
-    const { title, description, grade_id } = sanitizedData;
+    const { title, description } = sanitizedData;
 
     const category = await repository.findById(id);
     if (!category) {
@@ -198,7 +190,6 @@ async function updateReadingCategory(req, res) {
     const updateData = {
       title,
       description,
-      grade_id,
       image: imageUrl,
       updated_at: new Date(),
       is_active:
@@ -232,7 +223,7 @@ async function deleteReadingCategory(req, res) {
 
 async function getReadingCategoriesWithStats(req, res) {
   try {
-    const { pageNumb = 1, pageSize = 10, searchTerm = "", grade_id } = req.body;
+    const { pageNumb = 1, pageSize = 10, searchTerm = "" } = req.body;
 
     const offset = (pageNumb - 1) * pageSize;
     const limit = parseInt(pageSize);
@@ -241,9 +232,8 @@ async function getReadingCategoriesWithStats(req, res) {
       offset,
       limit,
       searchTerm,
-      grade_id
     );
-    const total = await repository.countAllWithStats(searchTerm, grade_id);
+    const total = await repository.countAllWithStats(searchTerm);
     const totalPage = Math.ceil(total / pageSize);
 
     return messageManager.fetchSuccess(
@@ -320,7 +310,7 @@ async function getReadingCategoriesNoFilter(req, res) {
 module.exports = {
   getReadingCategories,
   getReadingCategoryById,
-  getReadingCategoryByGrade,
+  // getReadingCategoryByGrade,
   createReadingCategory,
   updateReadingCategory,
   deleteReadingCategory,

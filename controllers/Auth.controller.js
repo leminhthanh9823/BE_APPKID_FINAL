@@ -89,7 +89,12 @@ class AuthController {
       }
 
       const accessToken = jwt.sign(
-        { id: newUser.id, username: newUser.username },
+        { 
+          id: newUser.id, 
+          username: newUser.username,
+          role_id: newUser.role_id,
+          status: newUser.status 
+        },
         ACCESS_TOKEN_SECRET_KEY,
         { expiresIn: ACCESS_TOKEN_EXPIRATION }
       );
@@ -180,7 +185,13 @@ class AuthController {
       }
 
       const accessToken = jwt.sign(
-        { id: user.id, email: user.email, role_id: user.role_id },
+        { 
+          id: user.id, 
+          email: user.email, 
+          role_id: user.role_id,
+          status: user.status,
+          username: user.username
+        },
         ACCESS_TOKEN_SECRET_KEY,
         { expiresIn: ACCESS_TOKEN_EXPIRATION }
       );
@@ -415,7 +426,13 @@ class AuthController {
 
       // 4. Nếu Refresh Token hợp lệ, tạo cặp Access và Refresh Token mới
       const newAccessToken = jwt.sign(
-        { id: user.id, username: user.username },
+        { 
+          id: user.id, 
+          username: user.username,
+          role_id: user.role_id,
+          status: user.status,
+          email: user.email
+        },
         ACCESS_TOKEN_SECRET_KEY,
         { expiresIn: ACCESS_TOKEN_EXPIRATION }
       );
@@ -557,7 +574,13 @@ class AuthController {
 
       // Tạo Access Token
       const accessToken = jwt.sign(
-        { id: user.id, email: user.email },
+        { 
+          id: user.id, 
+          email: user.email,
+          username: user.username,
+          role_id: user.role_id,
+          status: user.status
+        },
         ACCESS_TOKEN_SECRET_KEY,
         { expiresIn: ACCESS_TOKEN_EXPIRATION }
       );

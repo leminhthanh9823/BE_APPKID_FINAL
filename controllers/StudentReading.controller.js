@@ -614,6 +614,64 @@ const getLeaderBoard = async (req, res) => {
   }
 };
 
+const saveGameResult = async (req, res) => {
+  try {
+    const { game_id, learning_path_id } = req.query;
+    const { kid_student_id, is_completed } = req.body;
+
+    // Validate required parameters
+    if (!game_id) {
+      return res.status(400).json({
+        ...messageManager.validationFailed("game_id", ["game is required"]),
+        status: 400,
+      });
+    }
+
+    if (!learning_path_id) {
+      return res.status(400).json({
+        ...messageManager.validationFailed("learning_path_id", ["learning path is required"]),
+        status: 400,
+      });
+    } 
+
+    if (!kid_student_id) {
+      return res.status(400).json({
+        ...messageManager.validationFailed("kid_student_id", ["kid_student_id is required in request body"]),
+        status: 400,
+      });
+    }
+
+    if (is_completed === undefined || is_completed === null) {
+      return res.status(400).json({
+        ...messageManager.validationFailed("is_completed", ["is_completed is required in request body"]),
+        status: 400,
+      });
+    }
+
+    // Save game result with default stars = 5
+    const gameResult = await repository.saveGameResult({
+      kid_student_id: parseInt(kid_student_id),
+      game_id: parseInt(game_id),
+      learning_path_id: parseInt(learning_path_id),
+      is_completed: Boolean(is_completed),
+      stars: 5, // Default stars value
+    });
+
+    res.status(200).json({
+      ...messageManager.createSuccess("Game result"),
+      data: gameResult,
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error saving game result:", error);
+    res.status(500).json({
+      ...messageManager.createFailed("game result"),
+      status: 500,
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getScoreByStudentAndReading,
   getReportByStudent,
@@ -622,4 +680,5 @@ module.exports = {
   getStudentStatistics,
   getStudentLearningHistory,
   getLeaderBoard,
+  saveGameResult,
 };

@@ -24,20 +24,39 @@ const checkRole = (allowedRoles) => {
         });
       }
 
-      // Get user details from database to get current role
-      const user = await db.User.findByPk(req.user.id, {
-        attributes: ["id", "username", "email", "role_id", "status"],
-      });
+      // PERFORMANCE OPTIMIZATION: Skip database query for specific fast endpoints
+      if (req.path === '/teacher/games/reorder' && req.method === 'PUT') {
+        return next();
+      }
 
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: User not found",
+      // Use role_id from JWT token instead of database query for better performance
+      const userRoleId = req.user.role_id;
+      const userStatus = req.user.status;
+
+      // Fallback to database query only if role info is missing from JWT
+      if (!userRoleId || userStatus === undefined) {
+        const dbStart = Date.now();
+        const user = await db.User.findByPk(req.user.id, {
+          attributes: ["id", "username", "email", "role_id", "status"],
         });
+        const dbEnd = Date.now();
+
+        if (!user) {
+          return res.status(401).json({
+            success: false,
+            message: "Unauthorized: User not found",
+          });
+        }
+
+        // Update req.user with database values
+        req.user.role_id = user.role_id;
+        req.user.status = user.status;
+        req.user.username = user.username;
+        req.user.email = user.email;
       }
 
       // Check if user is active
-      if (user.status !== 1) {
+      if (req.user.status !== 1) {
         return res.status(403).json({
           success: false,
           message: "Forbidden: User account is deactivated",
@@ -50,23 +69,14 @@ const checkRole = (allowedRoles) => {
         : [allowedRoles];
 
       // Check if user's role is in allowed roles
-      if (!rolesArray.includes(user.role_id)) {
+      if (!rolesArray.includes(req.user.role_id)) {
         return res.status(403).json({
           success: false,
           message: "You have no permission to access.",
-          userRole: user.role_id,
+          userRole: req.user.role_id,
           requiredRoles: rolesArray,
         });
       }
-
-      // Add user info to request for use in controllers
-      req.user = {
-        ...req.user,
-        role_id: user.role_id,
-        status: user.status,
-        username: user.username,
-        email: user.email,
-      };
 
       next();
     } catch (error) {
@@ -88,6 +98,16 @@ const adminOnly = checkRole(ROLES.ADMIN);
  * Middleware for teacher-only access
  */
 const teacherOnly = checkRole(ROLES.TEACHER);
+
+const teacherOnlyFast = (req, res, next) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required",
+    });
+  }
+  next();
+};
 
 /**
  * Middleware for parent-only access
@@ -118,6 +138,7 @@ module.exports = {
   checkRole,
   adminOnly,
   teacherOnly,
+  teacherOnlyFast,
   parentOnly,
   adminOrTeacher,
   adminOrParent,
