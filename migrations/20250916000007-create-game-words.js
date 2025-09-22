@@ -13,10 +13,6 @@ module.exports = {
       game_id: {
         type: Sequelize.BIGINT.UNSIGNED,
         allowNull: false,
-        references: {
-          model: 'games',
-          key: 'id'
-        },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },
@@ -39,13 +35,6 @@ module.exports = {
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
         onUpdate: Sequelize.literal('CURRENT_TIMESTAMP')
       }
-    });
-
-    // Add unique constraint for game_id and word_id combination
-    await queryInterface.addConstraint('game_words', {
-      fields: ['game_id', 'word_id'],
-      type: 'unique',
-      name: 'unique_game_word'
     });
 
     // Add index for game_id and sequence_order
