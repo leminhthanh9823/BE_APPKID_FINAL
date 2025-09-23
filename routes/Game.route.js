@@ -6,33 +6,39 @@ const { teacherOnly, teacherOnlyFast } = require("../middlewares/Role.middleware
 const upload = require("../middlewares/File.middleware");
 
 router.post('/teacher/readings/:readingId/games',
+  authMiddleware,
   teacherOnly,
   upload.single('image'),
   gameController.create
 );
 
 router.get('/teacher/readings/:readingId/games',
+  authMiddleware,
   teacherOnly,
   gameController.list
 );
 
 router.put('/teacher/games/reorder',
+  authMiddleware,
   teacherOnlyFast,
   gameController.reorder
 );
 
 router.get('/teacher/games/:id',
+  authMiddleware,
   teacherOnly,
   gameController.detail
 );
 
 router.put('/teacher/games/:id',
+  authMiddleware,
   teacherOnly,
   upload.single('image'),
   gameController.update
 );
 
 router.delete('/teacher/games/:id',
+  authMiddleware,
   teacherOnly,
   gameController.delete
 );
