@@ -181,34 +181,80 @@ async function getAll(req, res) {
   }
 }
 
-async function getById(req, res) {
+
+const getById = async (req, res) => {
   try {
     const { id } = req.params;
-    const data = await db.KidReading.findByPk(id, {
+
+    // Get reading details with related data
+    const reading = await db.KidReading.findByPk(id, {
       include: [
         {
           model: db.ReadingCategory,
           as: "category",
-          attributes: ["id", "title", "description", "image"],
-        },
+          attributes: ["id", "name", "description", "image"],
+        }
       ],
+      attributes: [
+        "id", 
+        "title", 
+        "reference", 
+        "description", 
+        "image", 
+        "file", 
+        "difficulty_level", 
+        "category_id", 
+        "is_active",
+        "created_at",
+        "updated_at"
+      ]
     });
-    if (!data) {
-      return messageManager.notFound("kidreading", res);
+
+    if (!reading) {
+      return res.json({
+        success: false,
+        status: 0,
+        ...messageManager.notFound("reading"),
+      });
     }
-    
-    // Transform data to maintain backward compatibility
-    const transformedData = {
-      ...data.toJSON(),
-      categories: data.category ? [data.category] : [],
-      category: data.category || null
-    };
-    
-    return messageManager.fetchSuccess("kidreading", transformedData, res);
+
+    // Get question count for this reading
+    const questionCount = await db.kid_questions.count({
+      where: { 
+        kid_reading_id: id,
+        is_active: 1
+      }
+    });
+
+    // Get game count for this reading
+    const gameCount = await db.Game.count({
+      where: { 
+        prerequisite_reading_id: id,
+        is_active: 1
+      }
+    });
+
+    // Add counts to the reading data
+    const readingData = reading.toJSON();
+    readingData.questionCount = questionCount;
+    readingData.gameCount = gameCount;
+
+    res.json({
+      success: true,
+      status: 1,
+      message: "Reading details retrieved successfully",
+      data: readingData,
+    });
   } catch (error) {
-  return messageManager.fetchFailed("kidreading", res);
+    console.error("Error in getReadingDetail:", error);
+    res.json({
+      success: false,
+      status: 0,
+      ...messageManager.fetchFailed("reading detail"),
+      error: error.message,
+    });
   }
-}
+};
 
 async function getByGrade(req, res) {
   try {
