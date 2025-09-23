@@ -637,6 +637,14 @@ class LearningPathRepository {
       total_items: transformedItems.length
     };
   }
+
+  async findAllForMobile(){
+    return await db.LearningPath.findAll({
+      where: { is_active: 1 },
+      attributes: ['id', 'name', 'description', 'difficulty_level', 'image'],
+      order: [['name', 'ASC']]
+    });
+  }
 }
 
 module.exports = new LearningPathRepository();
