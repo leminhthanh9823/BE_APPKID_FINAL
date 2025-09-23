@@ -95,7 +95,7 @@ class GameRepository {
         {
           model: sequelize.models.KidReading,
           as: 'prerequisiteReading',
-          attributes: ['id', 'title', 'description', 'image', 'level', 'is_active']
+          attributes: ['id', 'title', 'description', 'image', 'is_active']
         },
         {
           model: Word,
@@ -103,13 +103,13 @@ class GameRepository {
             model: GameWord,
             attributes: ['sequence_order']
           },
-          as: 'Words',
+          as: 'words',
           attributes: ['id', 'word', 'note', 'image', 'level', 'type', 'is_active'],
           required: false
         }
       ],
       order: [
-        [{ model: Word, as: 'Words' }, GameWord, 'sequence_order', 'ASC']
+        [{ model: Word, as: 'words' }, GameWord, 'sequence_order', 'ASC']
       ]
     });
   }
