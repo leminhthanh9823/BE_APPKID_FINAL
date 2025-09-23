@@ -717,99 +717,6 @@ async function deleteGameFromPath(req, res) {
   }
 }
 
-/**
- * GET /api/learning-paths/:pathId/categories
- * Lấy danh sách categories có trong learning path với điều kiện có ít nhất 1 item
- */
-async function getCategoriesInLearningPath(req, res) {
-  try {
-    const pathId = parseInt(req.params.pathId);
-    
-    if (isNaN(pathId)) {
-      return messageManager.validationFailed("learningpath", res, "Invalid learning path");
-    }
-
-    // Verify learning path exists
-    const learningPath = await db.LearningPath.findByPk(pathId, {
-      attributes: ['id', 'name']
-    });
-    
-    if (!learningPath) {
-      return messageManager.notFound("learningpath", res, "Learning path not found");
-    }
-
-    // Get categories with items
-    const categories = await repository.findCategoriesInLearningPath(pathId);
-    
-    const responseData = {
-      learning_path: {
-        id: learningPath.id,
-        name: learningPath.name
-      },
-      categories: categories,
-      total_categories: categories.length
-    };
-
-    return messageManager.fetchSuccess("learningpathcategory", responseData, res);
-
-  } catch (error) {
-    console.error("Get categories in learning path error:", error);
-    return messageManager.fetchFailed("learningpathcategory", res, error.message);
-  }
-}
-
-/**
- * GET /api/learning-paths/:pathId/categories/:categoryId/:studentId/items
- * Lấy danh sách items (readings + games) trong một category cụ thể của learning path với tiến độ học tập của học sinh
- */
-async function getItemsInCategory(req, res) {
-  try {
-    const pathId = parseInt(req.params.pathId);
-    const categoryId = parseInt(req.params.categoryId);
-    const studentId = parseInt(req.params.studentId);
-
-    if (isNaN(pathId) || isNaN(categoryId) || isNaN(studentId)) {
-      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path, category or student ID");
-    }
-
-    // Verify learning path exists
-    const learningPath = await db.LearningPath.findByPk(pathId, {
-      attributes: ['id', 'name']
-    });
-    
-    if (!learningPath) {
-      return messageManager.notFound("learningpath", res, "Learning path not found");
-    }
-
-    // Verify student exists
-    const student = await db.KidStudent.findByPk(studentId, {
-      attributes: ['id', 'name']
-    });
-    
-    if (!student) {
-      return messageManager.notFound("kidstudent", res, "Student not found");
-    }
-
-    // Get items in category with student progress
-    const result = await repository.findItemsInCategory(pathId, categoryId, studentId);
-    
-    if (!result) {
-      return messageManager.notFound("learningpathcategory", res, "Category not found in learning path or category has no items");
-    }
-
-    const responseData = {
-      items: result.items,
-      total_items: result.total_items
-    };
-
-    return messageManager.fetchSuccess("learningpathitem", responseData, res);
-
-  } catch (error) {
-    console.error("Get items in category error:", error);
-    return messageManager.fetchFailed("learningpathitem", res, error.message);
-  }
-}
-
 async function getLearningPathsForMobile(req, res) {
   try {
     const learningPaths = await repository.findAllForMobile();
@@ -817,6 +724,43 @@ async function getLearningPathsForMobile(req, res) {
   } catch (error) {
     console.error("Get learning paths for mobile error:", error);
     return messageManager.fetchFailed("learningpath", res, error.message);
+  }
+}
+
+
+async function getItemsInLearningPathForMobile(req, res) {
+  try {
+    const pathId = parseInt(req.params.pathId);
+    const studentId = parseInt(req.params.studentId);
+    
+    // Validate input parameters
+    if (isNaN(pathId) || isNaN(studentId)) {
+      return messageManager.validationFailed("learningpathitem", res, "Invalid learning path or student ID");
+    }
+
+    if (pathId <= 0 || studentId <= 0) {
+      return messageManager.validationFailed("learningpathitem", res, "Learning path ID and student ID must be positive numbers");
+    }
+
+    // Get learning path items with unlock logic
+    const result = await repository.findItemsInLearningPathForMobile(pathId, studentId);
+    
+    if (!result) {
+      return messageManager.notFound("learningpath", res, "Learning path not found or inactive");
+    }
+
+    // Return success response with structured data
+    return messageManager.fetchSuccess("learningpathitem", result, res);
+
+  } catch (error) {
+    console.error("Get items in learning path for mobile error:", error);
+    
+    // Handle specific database errors
+    if (error.name === 'SequelizeDatabaseError') {
+      return messageManager.fetchFailed("learningpathitem", res, "Database error occurred");
+    }
+    
+    return messageManager.fetchFailed("learningpathitem", res, error.message);
   }
 }
 
@@ -831,7 +775,8 @@ module.exports = {
   reorderItemsInCategory,
   deleteReadingFromPath,
   deleteGameFromPath,
-  getCategoriesInLearningPath,
-  getItemsInCategory,
-  getLearningPathsForMobile
+  getLearningPathsForMobile,
+  // getCategoriesInLearningPath,
+  // getItemsInCategory,
+  getItemsInLearningPathForMobile
 };

@@ -57,20 +57,6 @@ router.post(
   learningPathController.getItemsInLearningPath
 );
 
-// mobile: GET /:pathId/categories - Lấy danh sách categories có trong learning path
-router.get(
-  "/mobile/:pathId/categories",
-  jwtMiddleware,
-  learningPathController.getCategoriesInLearningPath
-);
-
-// mobile: GET /:pathId/categories/:categoryId/items - Lấy danh sách items trong category cụ thể
-router.get(
-  "/mobile/:pathId/categories/:categoryId/:studentId/items",
-  jwtMiddleware,
-  learningPathController.getItemsInCategory
-);
-
 // POST /:pathId/add-items - Thêm readings vào learning path
 router.post(
   "/:id/add-items",
@@ -117,5 +103,12 @@ router.get(
   jwtMiddleware,
   learningPathController.getLearningPathsForMobile
 );
+
+// mobile: GET /:pathId/:student-id/items - Lấy danh sách items trong learning path cho học sinh
+router.get(
+  "/mobile/:pathId/:studentId/items",
+  learningPathController.getItemsInLearningPathForMobile
+);
+
 
 module.exports = router;
