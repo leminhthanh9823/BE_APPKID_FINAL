@@ -4,7 +4,7 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     // Add sequence_order column to games table
-    await queryInterface.changeColumn('games', 'sequence_order', {
+    await queryInterface.addColumn('games', 'sequence_order', {
       type: Sequelize.INTEGER,
       allowNull: true,
       after: 'prerequisite_reading_id'
