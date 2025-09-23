@@ -20,7 +20,7 @@ class NotifyRepository {
           attributes: [
             "id",
             "notify_id",
-            // "grade_id",
+            "parent_id",
             "student_id",
             "is_to_all_parents",
             "is_active",
@@ -40,7 +40,7 @@ class NotifyRepository {
           attributes: [
             "id",
             "notify_id",
-            // "grade_id",
+            "parent_id",
             "student_id",
             "is_to_all_parents",
             "is_active",
@@ -52,6 +52,7 @@ class NotifyRepository {
 
   async getNotificationsForParent({
     studentId,
+    parentId,
     searchTerm = "",
     offset = 0,
     pageSize = 10,
@@ -81,10 +82,6 @@ class NotifyRepository {
       return { rows, count };
     }
 
-    const student = await KidStudent.findByPk(studentId, {
-      attributes: ["id", "grade_id"],
-    });
-
     let whereConditions = [];
 
     // Điều kiện 1: Thông báo gửi đến tất cả phụ huynh
@@ -92,11 +89,10 @@ class NotifyRepository {
       is_to_all_parents: 1,
     });
 
-    // Điều kiện 2: Thông báo gửi đến grade của student
-    // whereConditions.push({
-    //   grade_id: student.grade_id,
-    //   is_to_all_parents: 0,
-    // });
+    whereConditions.push({
+      parent_id: parentId,
+      is_to_all_parents: 0,
+    });
 
     // Điều kiện 3: Thông báo gửi trực tiếp đến student
     whereConditions.push({

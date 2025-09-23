@@ -347,6 +347,38 @@ async function getAllTeacher(req, res) {
   }
 }
 
+async function getAllParents(req, res) {
+  try {
+    const { pageNumb = 1, pageSize = 10, searchTerm = "" } = req.body || {};
+    const offset = (pageNumb - 1) * pageSize;
+    let whereClause = { role_id: 3 };
+    if (searchTerm && searchTerm.trim() !== "") {
+      const searchValue = searchTerm.trim();
+      whereClause[db.Sequelize.Op.or] = [
+        { name: { [db.Sequelize.Op.like]: `%${searchValue}%` } },
+        { email: { [db.Sequelize.Op.like]: `%${searchValue}%` } },
+        { phone: { [db.Sequelize.Op.like]: `%${searchValue}%` } },
+      ];
+    }
+    const result = await db.User.findAndCountAll({
+      where: whereClause,
+      offset,
+      limit: pageSize,
+      order: [["created_at", "DESC"]],
+      attributes: ["id", "name", "email", "phone"],
+    });
+    return messageManager.fetchSuccess("parent", {
+      records: result.rows,
+      total_record: result.count,
+      total_page: Math.ceil(result.count / pageSize),
+      current_page: pageNumb,
+      page_size: pageSize,
+    }, res);
+  } catch (error) {
+    return messageManager.fetchFailed("parent", res, error.message);
+  }
+}
+
 module.exports = {
   getAll,
   getById,
@@ -356,4 +388,5 @@ module.exports = {
   remove,
   toggleStatus,
   getAllTeacher,
+  getAllParents,
 };
