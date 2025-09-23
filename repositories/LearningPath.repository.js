@@ -541,7 +541,7 @@ class LearningPathRepository {
         learning_path_id: pathId,
         kid_student_id: studentId
       },
-      attributes: ['kid_reading_id', 'game_id', 'is_passed', 'star', 'created_at'],
+      attributes: ['kid_reading_id', 'game_id', 'is_completed', 'star', 'created_at'],
       order: [['created_at', 'DESC']] // Latest attempts first
     });
 
@@ -555,14 +555,14 @@ class LearningPathRepository {
         progressMap.set(key, {
           attempts: [],
           highest_stars: 0,
-          is_passed: false,
+          is_completed: false,
           tried_count: 0
         });
       }
       
       const progress = progressMap.get(key);
       progress.attempts.push({
-        is_passed: Boolean(record.is_passed),
+        is_completed: Boolean(record.is_completed),
         stars: record.star || 0,
         created_at: record.created_at
       });
@@ -570,8 +570,8 @@ class LearningPathRepository {
       // Update statistics
       progress.tried_count = progress.attempts.length;
       progress.highest_stars = Math.max(progress.highest_stars, record.star || 0);
-      if (record.is_passed) {
-        progress.is_passed = true;
+      if (record.is_completed) {
+        progress.is_completed = true;
       }
     });
 
@@ -617,14 +617,14 @@ class LearningPathRepository {
         const progress = studentProgressMap.get(progressKey);
         itemData.student_progress = {
           stars: progress.highest_stars,
-          is_passed: progress.is_passed,
+          is_completed: progress.is_completed,
           tried_count: progress.tried_count
         };
       } else if (studentId) {
         // Student hasn't attempted this item yet
         itemData.student_progress = {
           stars: 0,
-          is_passed: false,
+          is_completed: false,
           tried_count: 0
         };
       }

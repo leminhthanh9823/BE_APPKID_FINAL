@@ -5,8 +5,6 @@ const authMiddleware = require("../middlewares/Auth.middleware.js");
 const { teacherOnly, teacherOnlyFast } = require("../middlewares/Role.middleware.js");
 const upload = require("../middlewares/File.middleware");
 
-router.use(authMiddleware);
-
 router.post('/teacher/readings/:readingId/games',
   teacherOnly,
   upload.single('image'),

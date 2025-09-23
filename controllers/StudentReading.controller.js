@@ -91,7 +91,7 @@ async function getReportByStudent(req, res) {
 
 async function createStudentReading(req, res) {
   try {
-    const { kid_student_id, kid_reading_id, score, is_completed, duration } =
+    const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id } =
       req.body;
     const newRecord = await repository.create({
       kid_student_id,
@@ -99,6 +99,7 @@ async function createStudentReading(req, res) {
       score,
       is_completed,
       duration,
+      learning_path_id
     });
     res.json({
       success: true,
@@ -121,7 +122,6 @@ async function getHistoryReading(req, res) {
       student_id,
       title = null,
       is_completed = null,
-      is_passed,
       pageNumb = 1,
       pageSize = 10,
     } = req.body;
@@ -131,7 +131,6 @@ async function getHistoryReading(req, res) {
         student_id,
         title,
         is_completed,
-        is_passed,
         offset,
         pageSize
       );
@@ -140,7 +139,6 @@ async function getHistoryReading(req, res) {
         image: row.kid_readings.image ?? null,
         title: row.kid_readings.title ?? null,
         is_completed: row.is_completed,
-        is_passed: row.is_passed,
         duration: row.duration,
         star: row.star,
         score: row.score,
@@ -324,7 +322,6 @@ const getStudentStatistics = async (req, res) => {
         "duration",
         "created_at",
         "is_completed",
-        "is_passed",
         "score",
         "star",
         "date_reading",

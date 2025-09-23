@@ -45,15 +45,8 @@ const sanitizeKidReadingData = (data) => {
     }
   }
 
-  if (sanitized.categories && Array.isArray(sanitized.categories)) {
-    sanitized.category_ids = sanitized.categories
-      .map((id) => {
-        if (typeof id === "object" && id !== null) {
-          return parseInt(id.value || id.id || id.category_id || String(id));
-        }
-        return parseInt(id);
-      })
-      .filter((id) => !isNaN(id) && id > 0);
+  if (sanitized.category) {
+    sanitized.category = parseInt(sanitized.category.value || String(sanitized.category))
   }
 
   return sanitized;
@@ -65,15 +58,9 @@ const validateKidReadingData = (data, isUpdate = false) => {
   } else if (data.title.length > 255) {
     return "Title must be less than 255 characters";
   }
-  const categoryIds =
-    data.category_ids || (data.category_id ? [data.category_id] : []);
-  if (!categoryIds.length) {
-    return "Please select at least one category";
-  } else {
-    const invalidCategories = categoryIds.filter((id) => isNaN(id));
-    if (invalidCategories.length > 0) {
-      return "One or more categories are invalid";
-    }
+  const category = data.category;
+  if( !category || isNaN(parseInt(category)) || parseInt(category) < 0) {
+    return "Please select a category";
   }
   if (data.is_active === undefined || data.is_active === null) {
     return "Please select valid status";
@@ -85,38 +72,6 @@ const validateKidReadingData = (data, isUpdate = false) => {
     return "Reference cannot exceed 254 characters";
   }
   return null;
-};
-
-const parseCategoryIds = (reqBody) => {
-  let categoryIds = [];
-
-  if (reqBody["categories[]"]) {
-    categoryIds = Array.isArray(reqBody["categories[]"])
-      ? reqBody["categories[]"]
-      : [reqBody["categories[]"]];
-  } else if (reqBody["category_id[]"]) {
-    categoryIds = Array.isArray(reqBody["category_id[]"])
-      ? reqBody["category_id[]"]
-      : [reqBody["category_id[]"]];
-  } else if (reqBody.categories && Array.isArray(reqBody.categories)) {
-    categoryIds = reqBody.categories;
-  } else if (reqBody.category_ids) {
-    if (typeof reqBody.category_ids === "string") {
-      try {
-        categoryIds = JSON.parse(reqBody.category_ids);
-      } catch (e) {
-        categoryIds = reqBody.category_ids.split(",").map((id) => id.trim());
-      }
-    } else if (Array.isArray(reqBody.category_ids)) {
-      categoryIds = reqBody.category_ids;
-    }
-  } else if (reqBody.category_id && !Array.isArray(reqBody.category_id)) {
-    categoryIds = [reqBody.category_id];
-  }
-
-  return categoryIds
-    .map((id) => parseInt(id))
-    .filter((id) => !isNaN(id) && id > 0);
 };
 
 async function getAll(req, res) {
@@ -132,22 +87,20 @@ async function getAll(req, res) {
     const pageSize = parseInt(params.pageSize) || 10;
     const searchTerm = (params.searchTerm || "").toString().trim();
     const sorts = params.sorts || null;
-    const is_active = params.is_active !== undefined ? 
-      (params.is_active === true || params.is_active === "true" || params.is_active === 1) : null;
+    const is_active = params.is_active ?? null;
 
+    const category_id = params.category_id ? parseInt(params.category_id) : null;
     // Calculate offset
     const limit = Math.min(Math.max(pageSize, 1), 100); // Limit between 1-100
     const offset = (Math.max(pageNumb, 1) - 1) * limit;
 
-    // Get data from repository without grade_id
     const { count: total_record, rows: records } = await repository.findAllWithPaging(
       offset,
       limit,
       searchTerm,
       sorts,
       is_active,
-      null,
-      null
+      category_id
     );
 
     // Transform records
@@ -158,9 +111,7 @@ async function getAll(req, res) {
         is_active: recordData.is_active,
         created_at: formatDateToYYYYMMDD(recordData.created_at),
         updated_at: formatDateToYYYYMMDD(recordData.updated_at),
-        categories: recordData.categories || [],
-        category: recordData.categories?.[0] || null,
-        grades: recordData.grades || []
+        category: recordData.category,
       };
     });
 
@@ -320,21 +271,16 @@ async function getByCategoryAndStudentId(req, res) {
 
 async function createKidReading(req, res) {
   try {
-    const sanitizedData = sanitizeKidReadingData(req.body);
-    const {
+     const {
       title,
       is_active,
       description,
       reference,
-      is_send_notify,
-      description_notify,
-    } = sanitizedData;
-    const categoryIdsToProcess = parseCategoryIds(sanitizedData);
-    const validationData = {
-      ...sanitizedData,
-      category_ids: categoryIdsToProcess,
-    };
-    const validationError = validateKidReadingData(validationData);
+      category_id,
+    } = req.body;
+    const sanitizedData = sanitizeKidReadingData({title, is_active, description, reference, category: category_id});
+   
+    const validationError = validateKidReadingData(sanitizedData);
     if (validationError) {
       return messageManager.validationFailed("kidreading", res, validationError);
     }
@@ -351,11 +297,11 @@ async function createKidReading(req, res) {
     if (req.files?.image && !req.files.image[0].mimetype.startsWith("image/")) {
       return messageManager.validationFailed("kidreading", res, "Invalid image file");
     }
-    const categoriesExist = await db.ReadingCategory.findAll({
-      where: { id: categoryIdsToProcess },
+    const categoryExist = await db.ReadingCategory.findOne({
+      where: { id: category_id },
     });
-    if (categoriesExist.length !== categoryIdsToProcess.length) {
-      return messageManager.notFound("kidreading", res);
+    if (!categoryExist) {
+      return messageManager.notFound("readingcategory", res);
     }
     const imageUrl = await uploadToMinIO(req.files.image[0], "kid_reading");
     const fileUrl = await uploadToMinIO(req.files.file[0], "kid_reading");
@@ -425,13 +371,8 @@ async function updateKidReading(req, res) {
       return messageManager.notFound("kidreading", res);
     }
     const sanitizedData = sanitizeKidReadingData(req.body);
-    const { title, is_active, description, reference } = sanitizedData;
-    const categoryIdsToProcess = parseCategoryIds(sanitizedData);
-    const validationData = {
-      ...sanitizedData,
-      category_ids: categoryIdsToProcess,
-    };
-    const validationError = validateKidReadingData(validationData, true);
+    const { title, is_active, description, reference, category } = sanitizedData;
+    const validationError = validateKidReadingData(sanitizedData, true);
     if (validationError) {
       return messageManager.validationFailed("kidreading", res, validationError);
     }
@@ -443,14 +384,7 @@ async function updateKidReading(req, res) {
     if (!current) {
       return messageManager.notFound("kidreading", res);
     }
-    if (categoryIdsToProcess.length > 0) {
-      const categoriesExist = await db.ReadingCategory.findAll({
-        where: { id: categoryIdsToProcess },
-      });
-      if (categoriesExist.length !== categoryIdsToProcess.length) {
-        return messageManager.notFound("kidreading", res);
-      }
-    }
+
     const imageUrl = req.files?.image
       ? await uploadToMinIO(req.files.image[0], "kid_reading")
       : current.image;
@@ -510,86 +444,55 @@ async function toggleStatus(req, res) {
 
 async function getKidReadingByCategory(req, res) {
   try {
-    const { category_id } = req.params;
-    const {
-      pageNumb = 1,
-      pageSize = 10,
-      searchTerm = "",
-      is_active = null,
-    } = req.body || {};
-    if (!category_id || isNaN(category_id)) {
-      return messageManager.notFound("readingcategory", res);
-    }
-    const page = parseInt(pageNumb);
-    const limit = parseInt(pageSize);
-    const offset = (page - 1) * limit;
-    const whereClause = {};
-    if (is_active !== null) whereClause.is_active = is_active;
-    if (searchTerm) {
-      whereClause.title = { [db.Sequelize.Op.like]: `%${searchTerm}%` };
-    }
-    const categoryRelations = await db.ReadingCategoryRelations.findAll({
-      where: { category_id: category_id },
-      attributes: ["reading_id"],
-    });
-    const readingIds = categoryRelations.map((rel) => rel.reading_id);
-    if (!readingIds.length) {
-      return messageManager.fetchSuccess("kidreading", {
-        records: [],
-        total_record: 0,
-        total_page: 0,
-      }, res);
-    }
-    let includeCategories = {
-      model: db.ReadingCategory,
-      as: "category",
-      attributes: ["id", "title", "description", "image"],
+
+    const params = {
+      ...req.query,
+      ...req.body,
     };
-    const { rows, count: total } = await db.KidReading.findAndCountAll({
-      where: {
-        ...whereClause,
-        id: { [db.Sequelize.Op.in]: readingIds },
-      },
-      include: [includeCategories],
+
+    const pageNumb = parseInt(params.pageNumb) || 1;
+    const pageSize = parseInt(params.pageSize) || 10;
+    const searchTerm = (params.searchTerm || "").toString().trim();
+    const sorts = params.sorts || null;
+    const is_active = params.is_active ?? null;
+
+    const category_id = req.params.category_id ? parseInt(req.params.category_id) : null;
+    // Calculate offset
+    const limit = Math.min(Math.max(pageSize, 1), 100);
+    const offset = (Math.max(pageNumb, 1) - 1) * limit;
+
+    const { count: total_record, rows: records } = await repository.findAllWithPaging(
       offset,
       limit,
-      distinct: true,
-      order: [["created_at", "DESC"]],
-    });
-    const filteredIds = rows.map(r => r.id);
-    let fullReadings = [];
-    if (filteredIds.length > 0) {
-      fullReadings = await db.KidReading.findAll({
-        where: { id: { [db.Sequelize.Op.in]: filteredIds } },
-        include: [
-          {
-            model: db.ReadingCategory,
-            as: "category",
-            attributes: ["id", "title", "description", "image"],
-          },
-        ],
-      });
-    }
-    const transformedRecords = fullReadings.map((reading) => {
-      const readingData = reading.toJSON ? reading.toJSON() : { ...reading };
-      const category = readingData.category || null;
-      const categories = category ? [category] : [];
+      searchTerm,
+      sorts,
+      is_active,
+      category_id
+    );
+
+    // Transform records
+    const transformedRecords = records.map((record) => {
+      const recordData = record.toJSON ? record.toJSON() : { ...record };
       return {
-        ...readingData,
-        is_active: readingData.is_active,
-        created_at: formatDateToYYYYMMDD(readingData.created_at),
-        updated_at: formatDateToYYYYMMDD(readingData.updated_at),
-        categories: categories,
-        category: category,
-        categories_names: categories.map((cat) => cat.title).join(", "),
+        ...recordData,
+        is_active: recordData.is_active,
+        created_at: formatDateToYYYYMMDD(recordData.created_at),
+        updated_at: formatDateToYYYYMMDD(recordData.updated_at),
+        category: recordData.category,
       };
     });
-    const totalPage = Math.ceil(total / limit);
+
+    // Calculate pagination
+    const total_page = Math.ceil(total_record / limit);
+
     return messageManager.fetchSuccess("kidreading", {
       records: transformedRecords,
-      total_record: total,
-      total_page: totalPage,
+      total_record,
+      total_page,
+      current_page: pageNumb,
+      page_size: limit
     }, res);
+
   } catch (error) {
   return messageManager.fetchFailed("kidreading", res);
   }

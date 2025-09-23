@@ -195,9 +195,8 @@ class KidReadingRepository {
         image,
         file,
         reference,
-        category_id, // Ensure category_id is explicitly set
+        category_id,
       },
-      { transaction }
     );
     return createdReading;
   }
@@ -261,13 +260,22 @@ class KidReadingRepository {
     limit,
     searchTerm,
     sorts,
-    is_active,
-    category_ids = null
+    is_active = null,
+    category_id = null
   ) {
+
     const where = {};
 
     if (searchTerm) {
       where.title = { [Op.like]: `%${searchTerm}%` };
+    }
+
+    if (is_active !== null && is_active !== undefined) {
+      where.is_active = is_active;
+    }
+
+    if (category_id !== null && category_id !== undefined) {
+      where.category_id = category_id;
     }
 
     // if (is_active !== null && is_active !== undefined) {
@@ -278,78 +286,37 @@ class KidReadingRepository {
       : [["created_at", "DESC"]];
 
     return this.withRetry(async () => {
-      let includeCategories = {
-        model: db.ReadingCategory,
-        as: "category",
-        attributes: ["id", "title", "description", "image"],
-      };
-      if (category_ids && category_ids.length > 0) {
-        includeCategories.where = {
-          id: { [Op.in]: category_ids },
-        };
-        includeCategories.required = true;
-      }
-      let queryOptions = {
+      const result = await KidReading.findAndCountAll({
         where,
         offset,
         limit,
         order,
         distinct: true,
-        include: [includeCategories],
-      };
-      const result = await KidReading.findAndCountAll(queryOptions);
-      const readingIds = result.rows.map(r => r.id);
-      let fullReadings = [];
-      if (readingIds.length > 0) {
-        fullReadings = await KidReading.findAll({
-          where: { id: { [Op.in]: readingIds } },
-          include: [
-            {
-              model: db.ReadingCategory,
-              as: "category",
-              attributes: ["id", "title", "description", "image"],
-            },
-          ],
-        });
-      }
-      result.rows = fullReadings.map((reading) => {
+        include: [
+          {
+            model: db.ReadingCategory,
+            as: "category",
+            attributes: ["id", "title", "description", "image"],
+          },
+        ],
+      });
+      result.rows = result.rows.map((reading) => {
         const readingData = reading.get ? reading.get({ plain: true }) : reading;
         const category = readingData.category || null;
         return {
-          ...readingData,
-          category,
-          categories: category ? [category] : [] // Convert single category to array for backward compatibility
+          id: readingData.id,
+          title: readingData.title,
+          description: readingData.description,
+          image: readingData.image,
+          file: readingData.file,
+          reference: readingData.reference,
+          is_active: readingData.is_active,
+          category: category ? category.id : null,
+          category_title: category ? category.title : null,
         };
       });
       return result;
     });
-  }
-
-  async countTotalReadingsEachGrades() {
-    // Đếm số sách theo grade_id của ReadingCategory
-    const readings = await KidReading.findAll({
-      where: { is_active: 1 },
-      include: [
-        {
-          model: db.ReadingCategory,
-          as: "category",
-          attributes: ["grade_id"],
-          required: true,
-        },
-      ],
-    });
-    // Gom nhóm theo grade_id
-    const countByGrade = {};
-    readings.forEach((reading) => {
-      if (reading.category) {
-        if (!countByGrade[reading.category.grade_id]) countByGrade[reading.category.grade_id] = 0;
-        countByGrade[reading.category.grade_id]++;
-      }
-    });
-    return Object.entries(countByGrade).map(([grade_id, count]) => ({
-      grade_id,
-      count,
-    }));
   }
 
   async getAllActiveReadings(searchTerm = "") {

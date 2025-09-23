@@ -5,6 +5,8 @@ const jwtMiddleware = require("../middlewares/Auth.middleware.js");
 const upload = require("../middlewares/File.middleware.js");
 const { adminOrTeacher } = require("../middlewares/Role.middleware.js");
 router.post("/all", jwtMiddleware, controller.getAll);
+
+//cms
 router.post("/stats", jwtMiddleware, adminOrTeacher, controller.getEBookCategoriesWithStats);
 router.get("/all-M", jwtMiddleware, controller.getAllM);
 router.get("/:id", jwtMiddleware, controller.getById);

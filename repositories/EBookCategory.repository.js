@@ -69,30 +69,30 @@ class EBookCategoryRepository {
     }
 
     const categories = await EBookCategory.findAll({
+      where: whereClause,
+      offset,
+      limit,
+      order: [["title", "ASC"]],
       attributes: [
         "id",
         "title",
-        "description",
-        "image",
+        "description", 
+        "image", 
         "icon",
         "is_active",
         "created_at",
         "updated_at",
         [
           Sequelize.literal(`(
-            SELECT COUNT(DISTINCT el.id)
-            FROM e_libraries el
-            INNER JOIN e_library_categories_relations elcr ON el.id = elcr.elibrary_id
-            WHERE elcr.elibrary_categories_id = e_library_categories.id 
+            SELECT COUNT(DISTINCT elcr.elibrary_id)
+            FROM e_library_categories_relations elcr
+            INNER JOIN e_libraries el ON el.id = elcr.elibrary_id
+            WHERE elcr.elibrary_categories_id = EBookCategory.id 
             AND el.is_active = 1
           )`),
-          "total_ebooks",
-        ],
-      ],
-      where: whereClause,
-      offset,
-      limit,
-      order: [["title", "ASC"]],
+          "total_ebooks"
+        ]
+      ]
     });
 
     return categories.map((category) => ({
