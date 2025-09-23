@@ -18,9 +18,10 @@ function validateNotificationData(data) {
   if (data.is_active === undefined || data.is_active === null) {
     return "Please select one status";
   }
-  if (data.type_target === 1 && (!Array.isArray(data.grades) || data.grades.length === 0)) {
-    return "Please select at least one grade";
-  }
+  // đổi thành parents
+  // if (data.type_target === 1 && (!Array.isArray(data.grades) || data.grades.length === 0)) {
+  //   return "Please select at least one grade";
+  // }
   if (data.type_target === 2 && (!Array.isArray(data.students) || data.students.length === 0)) {
     return "Please select at least one student";
   }
@@ -79,7 +80,7 @@ exports.getAll = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { title, content, type_target, is_active, grades, students } = req.body;
+    const { title, content, type_target, is_active, students } = req.body;
     const validationError = validateNotificationData(req.body);
     if (validationError) {
       return messageManager.validationFailed("notification", res, validationError);
@@ -111,13 +112,14 @@ exports.create = async (req, res) => {
         );
       }
 
-      if (type_target === 1 && Array.isArray(grades)) {
-        result = await NotifyTargetRepository.createGradeNotification({
-          notification_id: newNotification.id,
-          grade_ids: grades,
-          transaction: transaction,
-        });
-      }
+      // Đổi thành parents
+      // if (type_target === 1 && Array.isArray(grades)) {
+      //   result = await NotifyTargetRepository.createGradeNotification({
+      //     notification_id: newNotification.id,
+      //     grade_ids: grades,
+      //     transaction: transaction,
+      //   });
+      // }
 
       if (type_target === 2 && Array.isArray(students)) {
         result = await NotifyTargetRepository.createStudentNotification({
@@ -171,12 +173,13 @@ exports.updateById = async (req, res) => {
       });
 
     let type_target = 0;
-    if (targetNotifications[0] && targetNotifications[0].grade_id) {
-      type_target = 1;
-    } else if (targetNotifications[0] && targetNotifications[0].student_id) {
+    // if (targetNotifications[0] && targetNotifications[0].grade_id) {
+    //   type_target = 1;
+    // }
+    if (targetNotifications[0] && targetNotifications[0].student_id) {
       type_target = 2;
     }
-    const validationError = validateNotificationData({ title, content, is_active, type_target, grades, students });
+    const validationError = validateNotificationData({ title, content, is_active, type_target, students });
 
     if (validationError) {
       return messageManager.validationFailed("notification", res, validationError);
@@ -197,41 +200,11 @@ exports.updateById = async (req, res) => {
         }
       );
 
-      if (type_target === 1 && targetNotifications.length > 0) {
-        const existingGradeIds = targetNotifications
-          .map((t) => t.grade_id)
-          .filter((id) => id !== null);
-        const newGradeIds = grades.filter(
-          (id) => !existingGradeIds.includes(id)
-        );
-        const removedGradeIds = existingGradeIds.filter(
-          (id) => !grades.includes(id)
-        );
+      // Đổi thành parents: Impleement như gửi cho students ở dưới
+      
+      // CODE HERE:
 
-        // Remove grades that are not in the new list
-        if (removedGradeIds.length > 0) {
-          await db.NotifyTarget.destroy({
-            where: {
-              notify_id: id,
-              grade_id: removedGradeIds,
-            },
-            transaction,
-          });
-        }
-
-        // Add new grades that are not in the old list
-        if (newGradeIds.length > 0) {
-          await db.NotifyTarget.bulkCreate(
-            newGradeIds.map((gradeId) => ({
-              notify_id: id,
-              grade_id: gradeId,
-              student_id: null,
-              is_to_all_parents: 0,
-            })),
-            { transaction }
-          );
-        }
-      }
+      //
 
       if (type_target === 2 && targetNotifications.length > 0) {
         const existingStudentIds = targetNotifications
@@ -256,7 +229,7 @@ exports.updateById = async (req, res) => {
           await db.NotifyTarget.bulkCreate(
             newStudentIds.map((studentId) => ({
               notify_id: id,
-              grade_id: null,
+              // grade_id: null,
               student_id: studentId,
               is_to_all_parents: 0,
             })),

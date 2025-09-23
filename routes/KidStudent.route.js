@@ -22,6 +22,8 @@ router.post(
   jwtMiddleware,
   controller.parentUpdateChild
 );
+
+//cms
 router.post("/students-parents", jwtMiddleware, controller.getStudentsParents);
 router.put("/:id/update-status", jwtMiddleware, adminOrTeacher, controller.toggleStatus);
 

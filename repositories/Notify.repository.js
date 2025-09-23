@@ -20,7 +20,7 @@ class NotifyRepository {
           attributes: [
             "id",
             "notify_id",
-            "grade_id",
+            // "grade_id",
             "student_id",
             "is_to_all_parents",
             "is_active",
@@ -40,7 +40,7 @@ class NotifyRepository {
           attributes: [
             "id",
             "notify_id",
-            "grade_id",
+            // "grade_id",
             "student_id",
             "is_to_all_parents",
             "is_active",
@@ -93,10 +93,10 @@ class NotifyRepository {
     });
 
     // Điều kiện 2: Thông báo gửi đến grade của student
-    whereConditions.push({
-      grade_id: student.grade_id,
-      is_to_all_parents: 0,
-    });
+    // whereConditions.push({
+    //   grade_id: student.grade_id,
+    //   is_to_all_parents: 0,
+    // });
 
     // Điều kiện 3: Thông báo gửi trực tiếp đến student
     whereConditions.push({

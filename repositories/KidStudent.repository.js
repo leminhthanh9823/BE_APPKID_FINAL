@@ -79,13 +79,8 @@ class KidStudentRepository {
     offset = 0,
     limit = 10,
     searchTerm = "",
-    grade_id = null
   ) {
     let whereCondition = {};
-
-    if (grade_id) {
-      whereCondition.grade_id = grade_id;
-    }
 
     let searchConditions = {};
     if (searchTerm && searchTerm.trim() !== "") {
@@ -118,7 +113,6 @@ class KidStudentRepository {
       offset,
       limit,
       order: [
-        ["grade_id", "ASC"],
         ["name", "ASC"],
       ],
       distinct: true,

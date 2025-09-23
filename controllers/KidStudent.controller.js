@@ -168,14 +168,13 @@ async function parentCreateChild(req, res) {
 
 async function getStudentsParents(req, res) {
   try {
-    const { searchTerm, grade_id, pageNumb = 1, pageSize = 10 } = req.body;
+    const { searchTerm, pageNumb = 1, pageSize = 10 } = req.body;
     const offset = (pageNumb - 1) * pageSize;
     const { rows, total_record } =
       await KidStudentRepository.findStudentsWithParents(
         offset,
         pageSize,
         searchTerm,
-        grade_id
       );
     let result = rows.map((row) => {
       return {
@@ -190,25 +189,17 @@ async function getStudentsParents(req, res) {
         parent_email: row.parent ? row.parent.email : null,
       };
     });
-    let totalReadingsEachGrade = await KidReadingRepository.countTotalReadingsEachGrades();
     
-    let passedList = await StudentReadingRepository.getPassedCountsByStudentId(
+    let completedList = await StudentReadingRepository.getCompletedCountsByStudentId(
       result.map((r) => r.student_id)
     );
+    
     result = result.map((student) => {
-      let res = passedList.find((p) => p.student_id === student.student_id);
-      let passed_count = res ? res.passed_count : 0;
-      let student_grade_num = Number(student.student_grade);
-      let total_reading =
-        totalReadingsEachGrade.find((g) => Number(g.grade_id) === student_grade_num)
-          ?.count || 0;
+      let res = completedList.find((p) => p.student_id === student.student_id);
+      let completed_count = res ? res.completed_count : 0;
       return {
         ...student,
-        total_passed: passed_count + "/" + total_reading,
-        percent:
-          total_reading > 0
-            ? ((passed_count / total_reading) * 100).toFixed(0)
-            : 0,
+        completed_count: completed_count
       };
     });
     return messageManager.fetchSuccess("student", {
