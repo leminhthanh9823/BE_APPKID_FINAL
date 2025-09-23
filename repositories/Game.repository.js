@@ -95,7 +95,7 @@ class GameRepository {
         {
           model: sequelize.models.KidReading,
           as: 'prerequisiteReading',
-          attributes: ['id', 'title', 'description', 'image', 'level', 'is_active']
+          attributes: ['id', 'title', 'description', 'image', 'is_active']
         },
         {
           model: Word,
@@ -103,13 +103,13 @@ class GameRepository {
             model: GameWord,
             attributes: ['sequence_order']
           },
-          as: 'Words',
+          as: 'words',
           attributes: ['id', 'word', 'note', 'image', 'level', 'type', 'is_active'],
           required: false
         }
       ],
       order: [
-        [{ model: Word, as: 'Words' }, GameWord, 'sequence_order', 'ASC']
+        [{ model: Word, as: 'words' }, GameWord, 'sequence_order', 'ASC']
       ]
     });
   }
@@ -233,61 +233,7 @@ class GameRepository {
       whereConditions.type = type;
     }
 
-      // ULTRA FAST MODE: Skip heavy calculations if enabled
-      const ULTRA_FAST_MODE = process.env.ULTRA_FAST_MODE === 'true';
-      
-      if (ULTRA_FAST_MODE) {
-        const simpleQuery = `
-          SELECT 
-            g.id, g.name, g.description, g.type, g.image, 
-            g.sequence_order, g.is_active, g.created_at, g.updated_at,
-            kr.id as reading_id, kr.title as reading_title
-          FROM games g
-          LEFT JOIN kid_readings kr ON g.prerequisite_reading_id = kr.id
-          WHERE g.prerequisite_reading_id = ${parseInt(readingId)}
-          ORDER BY g.sequence_order ASC
-          LIMIT ${parseInt(limit)} OFFSET ${(page - 1) * parseInt(limit)}
-        `;
-        
-        const countQuery = `SELECT COUNT(*) as total FROM games WHERE prerequisite_reading_id = ${parseInt(readingId)}`;
-        
-        const [gamesResult, countResult] = await Promise.all([
-          sequelize.query(simpleQuery, { type: sequelize.QueryTypes.SELECT, raw: true }),
-          sequelize.query(countQuery, { type: sequelize.QueryTypes.SELECT, raw: true })
-        ]);
-        
-        const games = gamesResult.map(game => ({
-          id: game.id,
-          name: game.name,
-          description: game.description,
-          type: game.type,
-          image: game.image,
-          sequence_order: game.sequence_order,
-          is_active: game.is_active,
-          created_at: game.created_at,
-          updated_at: game.updated_at,
-          studentCompletionCount: 0, // Skip heavy calculation
-          wordCount: 0, // Skip heavy calculation
-          prerequisiteReading: game.reading_id ? {
-            id: game.reading_id,
-            title: game.reading_title
-          } : null
-        }));
-        
-        return {
-          games,
-          pagination: {
-            total: parseInt(countResult[0].total),
-            totalPages: Math.ceil(countResult[0].total / limit),
-            currentPage: parseInt(page),
-            limit: parseInt(limit)
-          }
-        };
-      }
-
-      // OPTIMIZED: Use single raw query instead of complex Sequelize query with subqueries
       const offset = (page - 1) * parseInt(limit);    try {
-      // Build WHERE clause for raw query
       let whereClause = `g.prerequisite_reading_id = ${parseInt(readingId)}`;
       
       if (searchTerm) {
