@@ -9,6 +9,7 @@ const {
 const upload = require("../middlewares/File.middleware.js");
 
 router.post("/all", jwtMiddleware, adminOnly, controller.getAll);
+router.post("/parents", jwtMiddleware, adminOrTeacher, controller.getAllParents);
 router.get("/:id", jwtMiddleware, adminOrTeacher, controller.getById);
 router.post(
   "/create",

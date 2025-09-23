@@ -1,6 +1,14 @@
 const { User } = require("../models");
 const { where, Op } = require("sequelize");
 class UserRepository {
+  async getAllParents() {
+    // role_id = 3 is assumed to be parent
+    return User.findAll({
+      where: { role_id: 3 },
+      attributes: ["id", "name", "email", "phone"],
+      order: [["created_at", "DESC"]],
+    });
+  }
   async findAll(condition = {}) {
     return User.findAll(condition);
   }
