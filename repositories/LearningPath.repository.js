@@ -420,386 +420,229 @@ class LearningPathRepository {
         transaction
       );
 
-      await transaction.commit();
+        await transaction.commit();
 
-      return {
-        success: true,
-        message: 'Categories reordered successfully',
-        updated_categories: updatedCategories.map(item => ({
-          category_id: item.category_id,
-          new_sequence_order: item.sequence_order
-        }))
-      };
+        return {
+          success: true,
+          message: 'Categories reordered successfully',
+          updated_categories: updatedCategories.map(item => ({
+            category_id: item.category_id,
+            new_sequence_order: item.sequence_order
+          }))
+        };
 
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
   }
 
-  /**
-   * Lấy các items (readings + games) trong một category cụ thể của learning path
-   * @param {number} pathId - ID của learning path
-   * @param {number} categoryId - ID của category
-   * @param {number} studentId - ID của học sinh
-   * @returns {Object} Thông tin category và các items với tiến độ học tập
-   */
-  async findItemsInCategory(pathId, categoryId, studentId) {
-    // 1. Find the LearningPathCategoryItem to get the bridge record
-    const categoryItem = await db.LearningPathCategoryItem.findOne({
-      where: {
-        learning_path_id: pathId,
-        category_id: categoryId,
-        is_active: 1
-      },
-      include: [
-        {
-          model: db.ReadingCategory,
-          as: 'category',
-          attributes: ['id', 'title', 'description', 'image']
-        }
-      ]
-    });
 
-    if (!categoryItem) {
-      return null;
-    }
-
-    // Get all items in this category with readings and games
-    const items = await db.LearningPathItem.findAll({
-      where: {
-        learning_path_category_id: categoryItem.id,
-        is_active: 1
-      },
-      include: [
-        {
-          model: db.KidReading,
-          as: 'reading',
-          attributes: ['id', 'title', 'image', 'is_active'],
-          required: false
-        },
-        {
-          model: db.Game,
-          as: 'game',
-          attributes: ['id', 'name', 'image', 'is_active', 'prerequisite_reading_id'],
-          required: false
-        }
-      ],
-      attributes: ['id', 'reading_id', 'game_id', 'sequence_order', 'is_active'],
-      order: [['sequence_order', 'ASC']]
-    });
-
-    // Get student progress for all items if studentId is provided
-    let studentProgressMap = new Map();
-
-    // Get all student readings for this learning path and student
-    const studentReadings = await db.StudentReading.findAll({
-      where: {
-        learning_path_id: pathId,
-        kid_student_id: studentId
-      },
-      attributes: ['kid_reading_id', 'game_id', 'is_completed', 'star', 'created_at'],
-      order: [['created_at', 'DESC']] // Latest attempts first
-    });
-
-    // Process student progress for each reading/game
-    const progressMap = new Map();
-    
-    studentReadings.forEach(record => {
-      const key = record.kid_reading_id ? `reading_${record.kid_reading_id}` : `game_${record.game_id}`;
-      
-      if (!progressMap.has(key)) {
-        progressMap.set(key, {
-          attempts: [],
-          highest_stars: 0,
-          is_completed: false,
-          tried_count: 0
-        });
-      }
-      
-      const progress = progressMap.get(key);
-      progress.attempts.push({
-        is_completed: Boolean(record.is_completed),
-        stars: record.star || 0,
-        created_at: record.created_at
+    async findAllForMobile(){
+      return await db.LearningPath.findAll({
+        where: { is_active: 1 },
+        attributes: ['id', 'name', 'description', 'difficulty_level', 'image'],
+        order: [['name', 'ASC']]
       });
-      
-      // Update statistics
-      progress.tried_count = progress.attempts.length;
-      progress.highest_stars = Math.max(progress.highest_stars, record.star || 0);
-      if (record.is_completed) {
-        progress.is_completed = true;
-      }
-    });
-
-    studentProgressMap = progressMap;
-
-    // Transform items to unified format with student progress
-    const transformedItems = items.map(item => {
-      let itemData = {
-        id: item.id,
-        sequence_order: item.sequence_order,
-        is_active: Boolean(item.is_active)
-      };
-
-      let progressKey = null;
-
-      // Handle reading item
-      if (item.reading) {
-        progressKey = `reading_${item.reading.id}`;
-        itemData = {
-          ...itemData,
-          reading_id: item.reading.id,
-          game_id: null,
-          name: item.reading.title,
-          image: item.reading.image,
-          prerequisite_reading_id: null
-        };
-      } 
-      // Handle game item  
-      else if (item.game) {
-        progressKey = `game_${item.game.id}`;
-        itemData = {
-          ...itemData,
-          reading_id: null,
-          game_id: item.game.id,
-          name: item.game.name,
-          image: item.game.image,
-          prerequisite_reading_id: item.game.prerequisite_reading_id
-        };
-      }
-
-      // Add student progress if available
-      if (studentId && progressKey && studentProgressMap.has(progressKey)) {
-        const progress = studentProgressMap.get(progressKey);
-        itemData.student_progress = {
-          stars: progress.highest_stars,
-          is_completed: progress.is_completed,
-          tried_count: progress.tried_count
-        };
-      } else if (studentId) {
-        // Student hasn't attempted this item yet
-        itemData.student_progress = {
-          stars: 0,
-          is_completed: false,
-          tried_count: 0
-        };
-      }
-
-      return itemData;
-    });
-
-    return {
-      items: transformedItems,
-      total_items: transformedItems.length
-    };
-  }
-
-  async findAllForMobile(){
-    return await db.LearningPath.findAll({
-      where: { is_active: 1 },
-      attributes: ['id', 'name', 'description', 'difficulty_level', 'image'],
-      order: [['name', 'ASC']]
-    });
-  }
-
-  /**
-   * Lấy tất cả categories và items trong learning path cho mobile với logic unlock
-   * @param {number} pathId - ID của learning path
-   * @param {number} studentId - ID của học sinh
-   * @returns {Object} Thông tin learning path với categories và items có logic unlock
-   */
-  async findItemsInLearningPathForMobile(pathId, studentId) {
-    // Execute all initial queries in parallel for better performance
-    const [learningPath, categoriesWithItems, studentReadings] = await Promise.all([
-      // 1. Get learning path info
-      db.LearningPath.findByPk(pathId, {
-        attributes: ['id', 'name', 'difficulty_level'],
-        where: { is_active: 1 }
-      }),
-
-      // 2. Get all categories with their items in one optimized query
-      db.LearningPathCategoryItem.findAll({
-        where: {
-          learning_path_id: pathId,
-          is_active: 1
-        },
-        include: [
-          {
-            model: db.ReadingCategory,
-            as: 'category',
-            attributes: ['id', 'title', 'description', 'image']
-          },
-          {
-            model: db.LearningPathItem,
-            as: 'items',
-            where: { is_active: 1 },
-            required: false,
-            attributes: ['id', 'reading_id', 'game_id', 'sequence_order', 'is_active'],
-            include: [
-              {
-                model: db.KidReading,
-                as: 'reading',
-                attributes: ['id', 'title', 'image', 'is_active'],
-                required: false
-              },
-              {
-                model: db.Game,
-                as: 'game',
-                attributes: ['id', 'name', 'image', 'is_active', 'prerequisite_reading_id'],
-                required: false
-              }
-            ],
-            order: [['sequence_order', 'ASC']]
-          }
-        ],
-        attributes: ['id', 'category_id', 'sequence_order'],
-        order: [
-          ['sequence_order', 'ASC'],
-          [{ model: db.LearningPathItem, as: 'items' }, 'sequence_order', 'ASC']
-        ]
-      }),
-
-      // 3. Get student progress for all items in this learning path
-      db.StudentReading.findAll({
-        where: {
-          learning_path_id: pathId,
-          kid_student_id: studentId
-        },
-        attributes: ['kid_reading_id', 'game_id', 'is_completed', 'star', 'created_at'],
-        order: [['created_at', 'DESC']]
-      })
-    ]);
-
-    if (!learningPath) {
-      return null;
     }
 
-    if (!categoriesWithItems.length) {
+    /**
+     * Lấy tất cả categories và items trong learning path cho mobile với logic unlock
+     * @param {number} pathId - ID của learning path
+     * @param {number} studentId - ID của học sinh
+     * @returns {Object} Thông tin learning path với categories và items có logic unlock
+     */
+    async findItemsInLearningPathForMobile(pathId, studentId) {
+      // Execute all initial queries in parallel for better performance
+      const [learningPath, categoriesWithItems, studentReadings] = await Promise.all([
+        // 1. Get learning path info
+        db.LearningPath.findByPk(pathId, {
+          attributes: ['id', 'name', 'difficulty_level'],
+          where: { is_active: 1 }
+        }),
+
+        // 2. Get all categories with their items in one optimized query
+        db.LearningPathCategoryItem.findAll({
+          where: {
+            learning_path_id: pathId,
+            is_active: 1
+          },
+          include: [
+            {
+              model: db.ReadingCategory,
+              as: 'category',
+              attributes: ['id', 'title', 'description', 'image']
+            },
+            {
+              model: db.LearningPathItem,
+              as: 'items',
+              where: { is_active: 1 },
+              required: false,
+              attributes: ['id', 'reading_id', 'game_id', 'sequence_order', 'is_active'],
+              include: [
+                {
+                  model: db.KidReading,
+                  as: 'reading',
+                  attributes: ['id', 'title', 'image', 'is_active'],
+                  required: false
+                },
+                {
+                  model: db.Game,
+                  as: 'game',
+                  attributes: ['id', 'name', 'image', 'is_active', 'prerequisite_reading_id'],
+                  required: false
+                }
+              ],
+              order: [['sequence_order', 'ASC']]
+            }
+          ],
+          attributes: ['id', 'category_id', 'sequence_order'],
+          order: [
+            ['sequence_order', 'ASC'],
+            [{ model: db.LearningPathItem, as: 'items' }, 'sequence_order', 'ASC']
+          ]
+        }),
+
+        // 3. Get student progress for all items in this learning path
+        db.StudentReading.findAll({
+          where: {
+            learning_path_id: pathId,
+            kid_student_id: studentId
+          },
+          attributes: ['kid_reading_id', 'game_id', 'is_completed', 'star', 'created_at'],
+          order: [['created_at', 'DESC']]
+        })
+      ]);
+
+      if (!learningPath) {
+        return null;
+      }
+
+      if (!categoriesWithItems.length) {
+        return {
+          learning_path: learningPath,
+          categories: [],
+          total_categories: 0,
+          overall_progress: {
+            total_items: 0,
+            completed_items: 0,
+            completion_percentage: 0
+          }
+        };
+      }
+
+      // Process student progress map - optimized to avoid storing unnecessary attempts array
+      const progressMap = new Map();
+      studentReadings.forEach(record => {
+        const key = record.kid_reading_id ? `reading_${record.kid_reading_id}` : `game_${record.game_id}`;
+        
+        if (!progressMap.has(key)) {
+          progressMap.set(key, {
+            highest_stars: record.star || 0,
+            is_completed: Boolean(record.is_completed),
+            tried_count: 1
+          });
+        } else {
+          const progress = progressMap.get(key);
+          progress.tried_count++;
+          progress.highest_stars = Math.max(progress.highest_stars, record.star || 0);
+          if (record.is_completed) {
+            progress.is_completed = true;
+          }
+        }
+      });
+
+      // Process categories and items - no more loops with database queries
+      let overallTotalItems = 0;
+      let overallCompletedItems = 0;
+      const processedCategories = [];
+
+      categoriesWithItems.forEach((categoryItem, i) => {
+        // Transform items with progress
+        const transformedItems = (categoryItem.items || []).map(item => {
+          let itemData = {
+            id: item.id,
+            sequence_order: item.sequence_order,
+            is_active: Boolean(item.is_active)
+          };
+
+          let progressKey = null;
+
+          if (item.reading) {
+            progressKey = `reading_${item.reading.id}`;
+            itemData = {
+              ...itemData,
+              reading_id: item.reading.id,
+              game_id: null,
+              name: item.reading.title,
+              image: item.reading.image,
+              prerequisite_reading_id: null
+            };
+          } else if (item.game) {
+            progressKey = `game_${item.game.id}`;
+            itemData = {
+              ...itemData,
+              reading_id: null,
+              game_id: item.game.id,
+              name: item.game.name,
+              image: item.game.image,
+              prerequisite_reading_id: item.game.prerequisite_reading_id
+            };
+          }
+
+          // Add student progress - simplified logic
+          const progress = progressMap.get(progressKey);
+          itemData.student_progress = progress ? {
+            stars: progress.highest_stars,
+            is_completed: progress.is_completed,
+            tried_count: progress.tried_count
+          } : {
+            stars: 0,
+            is_completed: false,
+            tried_count: 0
+          };
+
+          return itemData;
+        });
+
+        // Calculate category progress
+        const completedItems = transformedItems.filter(item => item.student_progress.is_completed).length;
+        const totalItems = transformedItems.length;
+        const completionPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+
+        // Determine if category is unlocked
+        const unlocked = i === 0 || processedCategories[i - 1].completion_percentage === 100;
+
+        const categoryData = {
+          id: categoryItem.category.id,
+          title: categoryItem.category.title,
+          description: categoryItem.category.description,
+          image: categoryItem.category.image,
+          sequence_order: categoryItem.sequence_order,
+          unlocked: unlocked,
+          items: transformedItems,
+          total_items: totalItems,
+          completed_items: completedItems,
+          completion_percentage: Math.round(completionPercentage * 100) / 100
+        };
+
+        processedCategories.push(categoryData);
+        overallTotalItems += totalItems;
+        overallCompletedItems += completedItems;
+      });
+
+      const overallCompletionPercentage = overallTotalItems > 0 ? (overallCompletedItems / overallTotalItems) * 100 : 0;
+
       return {
         learning_path: learningPath,
-        categories: [],
-        total_categories: 0,
+        categories: processedCategories,
+        total_categories: processedCategories.length,
         overall_progress: {
-          total_items: 0,
-          completed_items: 0,
-          completion_percentage: 0
+          total_items: overallTotalItems,
+          completed_items: overallCompletedItems,
+          completion_percentage: Math.round(overallCompletionPercentage * 100) / 100
         }
       };
-    }
-
-    // Process student progress map - optimized to avoid storing unnecessary attempts array
-    const progressMap = new Map();
-    studentReadings.forEach(record => {
-      const key = record.kid_reading_id ? `reading_${record.kid_reading_id}` : `game_${record.game_id}`;
-      
-      if (!progressMap.has(key)) {
-        progressMap.set(key, {
-          highest_stars: record.star || 0,
-          is_completed: Boolean(record.is_completed),
-          tried_count: 1
-        });
-      } else {
-        const progress = progressMap.get(key);
-        progress.tried_count++;
-        progress.highest_stars = Math.max(progress.highest_stars, record.star || 0);
-        if (record.is_completed) {
-          progress.is_completed = true;
-        }
-      }
-    });
-
-    // Process categories and items - no more loops with database queries
-    let overallTotalItems = 0;
-    let overallCompletedItems = 0;
-    const processedCategories = [];
-
-    categoriesWithItems.forEach((categoryItem, i) => {
-      // Transform items with progress
-      const transformedItems = (categoryItem.items || []).map(item => {
-        let itemData = {
-          id: item.id,
-          sequence_order: item.sequence_order,
-          is_active: Boolean(item.is_active)
-        };
-
-        let progressKey = null;
-
-        if (item.reading) {
-          progressKey = `reading_${item.reading.id}`;
-          itemData = {
-            ...itemData,
-            reading_id: item.reading.id,
-            game_id: null,
-            name: item.reading.title,
-            image: item.reading.image,
-            prerequisite_reading_id: null
-          };
-        } else if (item.game) {
-          progressKey = `game_${item.game.id}`;
-          itemData = {
-            ...itemData,
-            reading_id: null,
-            game_id: item.game.id,
-            name: item.game.name,
-            image: item.game.image,
-            prerequisite_reading_id: item.game.prerequisite_reading_id
-          };
-        }
-
-        // Add student progress - simplified logic
-        const progress = progressMap.get(progressKey);
-        itemData.student_progress = progress ? {
-          stars: progress.highest_stars,
-          is_completed: progress.is_completed,
-          tried_count: progress.tried_count
-        } : {
-          stars: 0,
-          is_completed: false,
-          tried_count: 0
-        };
-
-        return itemData;
-      });
-
-      // Calculate category progress
-      const completedItems = transformedItems.filter(item => item.student_progress.is_completed).length;
-      const totalItems = transformedItems.length;
-      const completionPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-
-      // Determine if category is unlocked
-      const unlocked = i === 0 || processedCategories[i - 1].completion_percentage === 100;
-
-      const categoryData = {
-        id: categoryItem.category.id,
-        title: categoryItem.category.title,
-        description: categoryItem.category.description,
-        image: categoryItem.category.image,
-        sequence_order: categoryItem.sequence_order,
-        unlocked: unlocked,
-        items: transformedItems,
-        total_items: totalItems,
-        completed_items: completedItems,
-        completion_percentage: Math.round(completionPercentage * 100) / 100
-      };
-
-      processedCategories.push(categoryData);
-      overallTotalItems += totalItems;
-      overallCompletedItems += completedItems;
-    });
-
-    const overallCompletionPercentage = overallTotalItems > 0 ? (overallCompletedItems / overallTotalItems) * 100 : 0;
-
-    return {
-      learning_path: learningPath,
-      categories: processedCategories,
-      total_categories: processedCategories.length,
-      overall_progress: {
-        total_items: overallTotalItems,
-        completed_items: overallCompletedItems,
-        completion_percentage: Math.round(overallCompletionPercentage * 100) / 100
-      }
-    };
   }
 }
 
