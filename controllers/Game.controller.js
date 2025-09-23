@@ -2,6 +2,7 @@ const { sequelize } = require('../models');
 const gameRepository = require('../repositories/Game.repository');
 const messageManager = require('../helpers/MessageManager.helper');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
+const { GAME_TYPES } = require('../constants/constant');
 
 const validateGameData = (data, isUpdate = false) => {
   if (!isUpdate || data.name !== undefined) {
@@ -68,7 +69,12 @@ class GameController {
         return messageManager.notFound('game', res);
       }
 
-      return messageManager.fetchSuccess('game', game, res);
+      // Lấy object dataValues nếu có
+      const raw = game.dataValues ? { ...game.dataValues } : { ...game };
+      const found = GAME_TYPES.find(t => t.value === Number(raw.type));
+      raw.type = found ? found.label : raw.type;
+
+      return messageManager.fetchSuccess('game', raw, res);
     } catch (error) {
       console.error('Get game detail error:', error);
       return messageManager.fetchFailed('game', res, error.message);

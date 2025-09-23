@@ -12,7 +12,7 @@ router.get(
   controller.getByReadingId
 );
 
-// Get questions by reading ID (mobile version)
+//app:  Get questions by reading ID (mobile version)
 router.post('/get-by-readingId', jwtMiddleware, controller.getQuestionsByReadingId);
 
 // Get question and its options by ID

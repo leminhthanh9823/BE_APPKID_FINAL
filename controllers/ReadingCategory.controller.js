@@ -8,23 +8,6 @@ const {
 const sanitizeReadingCategoryData = (data) => {
   const sanitized = { ...data };
 
-  // if (sanitized.grade_id !== undefined && sanitized.grade_id !== null) {
-  //   let gradeValue = sanitized.grade_id;
-  //   if (typeof gradeValue === "object" && gradeValue !== null) {
-  //     gradeValue =
-  //       gradeValue.value ||
-  //       gradeValue.id ||
-  //       gradeValue.grade_id ||
-  //       String(gradeValue);
-  //   }
-
-  //   sanitized.grade_id = parseInt(gradeValue);
-
-  //   if (isNaN(sanitized.grade_id)) {
-  //     delete sanitized.grade_id;
-  //   }
-  // }
-
   if (sanitized.is_active !== undefined) {
     let activeValue = sanitized.is_active;
     if (typeof activeValue === "object" && activeValue !== null) {

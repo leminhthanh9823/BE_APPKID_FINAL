@@ -31,7 +31,7 @@ class StudentReadingRepository {
   }
 
   async create(data) {
-    const { kid_student_id, kid_reading_id, score, is_completed, duration } = data;
+    const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id } = data;
 
     const newRecord = await StudentReading.create({
       kid_student_id: kid_student_id,
@@ -42,12 +42,13 @@ class StudentReadingRepository {
       date_reading: new Date(),
       star: score || 0,
       duration: duration || 0,
+      learning_path_id: learning_path_id || null
     });
 
     return newRecord;
   }
 
-  async getPassedCountsByStudentId(kid_student_ids) {
+  async getCompletedCountsByStudentId(kid_student_ids) {
     if (!Array.isArray(kid_student_ids) || kid_student_ids.length === 0) {
       console.warn("kid_student_ids is not an array or is empty. Returning empty array.");
       return [];
@@ -59,11 +60,11 @@ class StudentReadingRepository {
           kid_student_id: {
             [Op.in]: kid_student_ids,
           },
-          is_passed: true,
+          is_completed: 1,
         },
         attributes: [
           "kid_student_id",
-          [fn("COUNT", fn("DISTINCT", col("kid_reading_id"))), "passed_count"],
+          [fn("COUNT", fn("DISTINCT", col("kid_reading_id"))), "completed_count"],
         ],
         group: ["kid_student_id"],
         raw: true,
@@ -71,14 +72,14 @@ class StudentReadingRepository {
 
       return result.map((r) => ({
         student_id: r.kid_student_id,
-        passed_count: parseInt(r.passed_count, 10),
+        completed_count: parseInt(r.completed_count, 10),
       }));
     } catch (error) {
       throw error; 
     }
   }
   
-  async getHistoryReading(student_id, title, is_completed, is_passed, offset, pageSize) {
+  async getHistoryReading(student_id, title, is_completed, offset, pageSize) {
     const whereConditions = {
       kid_student_id: student_id,
       ...(title && { '$reading.title$': { [Op.like]: `%${title}%` } }),
@@ -86,9 +87,7 @@ class StudentReadingRepository {
     if (is_completed !== null && is_completed !== undefined) {
       whereConditions.is_completed = is_completed;
     }
-    if (is_passed !== null && is_passed !== undefined) {
-      whereConditions.is_passed = is_passed;
-    }
+
     let records;
     try {
       records = await StudentReading.findAndCountAll({

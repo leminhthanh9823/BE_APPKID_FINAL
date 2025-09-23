@@ -29,7 +29,10 @@ router.put(
   adminOrTeacher,
   controller.updateKidReading
 );
+//cms
 router.put("/:id/update-status", jwtMiddleware, adminOrTeacher, controller.toggleStatus);
+
+//cms
 router.post(
   "/create",
   jwtMiddleware,
@@ -38,6 +41,8 @@ router.post(
   controller.createKidReading
 );
 router.delete("/delete/:id", jwtMiddleware, adminOrTeacher, controller.deleteKidReading);
+
+//cms
 router.post(
   "/category/:category_id",
   jwtMiddleware,
@@ -50,6 +55,7 @@ router.post(
 );
 
 // API cho UC_LP04 - Get available readings by category
+//cms
 router.get("/:categoryId/available-readings", 
   controller.getAvailableReadingsByCategory
 );

@@ -9,7 +9,9 @@ router.get(
   controller.getScoreByStudentAndReading
 );
 router.post("/report", jwtMiddleware, controller.getReportByStudent);
+//app
 router.post("/create", jwtMiddleware, controller.createStudentReading);
+//cms
 router.post("/history-reading", jwtMiddleware, controller.getHistoryReading);
 router.get("/leaderboard", jwtMiddleware, controller.getLeaderBoard);
 
@@ -27,4 +29,3 @@ router.get(
 router.post("/game-result", jwtMiddleware, controller.saveGameResult);
 
 module.exports = router;
-  Ư

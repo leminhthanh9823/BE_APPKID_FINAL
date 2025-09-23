@@ -1,4 +1,4 @@
-const { ReadingCategory, KidReading, StudentReading, ReadingCategoryRelations } = require("../models");
+const { ReadingCategory, KidReading } = require("../models");
 const { where, Op, Sequelize } = require("sequelize");
 class ReadingCategoryRepository {
   async findAll() {
@@ -83,10 +83,9 @@ class ReadingCategoryRepository {
         'updated_at',
         [
           Sequelize.literal(`(
-            SELECT COUNT(DISTINCT kr.id)
+            SELECT COUNT(kr.id)
             FROM kid_readings kr
-            INNER JOIN reading_category_relations rcr ON kr.id = rcr.reading_id
-            WHERE rcr.category_id = reading_categories.id 
+            WHERE kr.category_id = reading_categories.id 
             AND kr.is_active = 1
           )`),
           'total_readings'
@@ -96,8 +95,7 @@ class ReadingCategoryRepository {
             SELECT COUNT(sr.id)
             FROM student_readings sr
             INNER JOIN kid_readings kr ON sr.kid_reading_id = kr.id
-            INNER JOIN reading_category_relations rcr ON kr.id = rcr.reading_id
-            WHERE rcr.category_id = reading_categories.id
+            WHERE kr.category_id = reading_categories.id
           )`),
           'total_attempts'
         ],
@@ -106,8 +104,7 @@ class ReadingCategoryRepository {
             SELECT COUNT(sr.id)
             FROM student_readings sr
             INNER JOIN kid_readings kr ON sr.kid_reading_id = kr.id
-            INNER JOIN reading_category_relations rcr ON kr.id = rcr.reading_id
-            WHERE rcr.category_id = reading_categories.id
+            WHERE kr.category_id = reading_categories.id
             AND sr.is_passed = 1
           )`),
           'total_passed'
