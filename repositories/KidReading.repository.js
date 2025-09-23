@@ -180,8 +180,13 @@ class KidReadingRepository {
     image,
     file,
     reference,
+    category_id,
     transaction,
   }) {
+    if (!category_id) {
+      throw new Error("category_id is required and cannot be null");
+    }
+
     const createdReading = await KidReading.create(
       {
         title,
@@ -190,6 +195,7 @@ class KidReadingRepository {
         image,
         file,
         reference,
+        category_id, // Ensure category_id is explicitly set
       },
       { transaction }
     );
@@ -199,10 +205,12 @@ class KidReadingRepository {
   async update(id, data) {
     return this.withRetry(async () => {
       const { categories, category_ids, category_id, ...readingData } = data;
+      // Always set category_id to the first in categoryIdsToProcess
+      const categoryIdsToProcess = category_ids || (category_id ? [category_id] : []);
+      if (categoryIdsToProcess.length > 0) {
+        readingData.category_id = categoryIdsToProcess[0];
+      }
       await KidReading.update(readingData, { where: { id } });
-
-      const categoryIdsToProcess =
-        category_ids || (category_id ? [category_id] : []);
 
       if (categoryIdsToProcess.length > 0) {
         const currentRelations = await ReadingCategoryRelations.findAll({
@@ -262,9 +270,9 @@ class KidReadingRepository {
       where.title = { [Op.like]: `%${searchTerm}%` };
     }
 
-    if (is_active !== null && is_active !== undefined) {
-      where.is_active = is_active;
-    }
+    // if (is_active !== null && is_active !== undefined) {
+    //   where.is_active = is_active;
+    // }
     const order = sorts
       ? sorts.map((sort) => [sort.field, sort.direction.toUpperCase()])
       : [["created_at", "DESC"]];

@@ -362,6 +362,10 @@ async function createKidReading(req, res) {
     if (!imageUrl || !fileUrl) {
       return messageManager.fetchFailed("kidreading", res);
     }
+
+    if (!imageUrl || !fileUrl) {
+      return messageManager.fetchFailed("kidreading", res);
+    }
     let transaction;
     try {
       const sequelize = db.sequelize;
@@ -373,6 +377,7 @@ async function createKidReading(req, res) {
         image: imageUrl,
         file: fileUrl,
         reference: reference || null,
+        category_id: categoryIdsToProcess[0],
         transaction,
       });
       const categoryRelations = categoryIdsToProcess.map((catId) => ({
@@ -459,11 +464,12 @@ async function updateKidReading(req, res) {
       image: imageUrl,
       file: fileUrl,
       reference,
+      category_id: categoryIdsToProcess[0],
       category_ids: categoryIdsToProcess,
     });
   return messageManager.updateSuccess("kidreading", { id }, res);
   } catch (error) {
-  return messageManager.updateFailed("kidreading", res);
+    return messageManager.updateFailed("kidreading", res);
   }
 }
 

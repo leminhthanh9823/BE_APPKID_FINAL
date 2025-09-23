@@ -54,6 +54,7 @@ db.LearningPathCategoryItem = require("./LearningPathCategoryItem.model")(sequel
 // Words models
 db.Word = require("./Words.model")(sequelize, Sequelize);
 db.GameWord = require("./GameWords.model")(sequelize, Sequelize);
+db.ReadingCategoryRelations = require("./ReadingCategoryRelations")(sequelize, Sequelize);
 
 db.User.associate && db.User.associate(db);
 db.EBook.associate && db.EBook.associate(db);

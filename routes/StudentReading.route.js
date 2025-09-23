@@ -27,4 +27,3 @@ router.get(
 router.post("/game-result", jwtMiddleware, controller.saveGameResult);
 
 module.exports = router;
-  Ư
