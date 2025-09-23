@@ -42,7 +42,6 @@ async function getAll(req, res) {
       pageSize = 10,
       searchTerm = "",
       kid_reading_id = null,
-      grade_id = null,
       is_active = null,
     } = req.body || {};
 
@@ -58,10 +57,6 @@ async function getAll(req, res) {
 
     if (kid_reading_id) {
       where.kid_reading_id = kid_reading_id;
-    }
-
-    if (grade_id) {
-      where.grade_id = grade_id;
     }
 
     if (is_active !== null && is_active !== undefined) {
@@ -184,7 +179,6 @@ async function createQuestionAndOptions(req, res) {
     const {
       question_level_id,
       kid_reading_id,
-      grade_id,
       question_category_id,
       question,
       question_type,
@@ -207,7 +201,6 @@ async function createQuestionAndOptions(req, res) {
         {
           question_level_id,
           kid_reading_id,
-          grade_id,
           question_category_id,
           question,
           question_type,
@@ -415,7 +408,6 @@ async function updateQuestionAndOptions(req, res) {
     } else {
       let {
         question_level_id,
-        grade_id,
         question,
         question_type,
         number_of_ans,
@@ -431,7 +423,6 @@ async function updateQuestionAndOptions(req, res) {
           id,
           {
             question_level_id,
-            grade_id,
             question,
             question_type,
             number_of_options: options.length,
