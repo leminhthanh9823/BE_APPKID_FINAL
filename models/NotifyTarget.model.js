@@ -8,21 +8,17 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
       },
       notify_id: DataTypes.BIGINT.UNSIGNED,
-      grade_id: {
-        type: DataTypes.INTEGER.UNSIGNED,
+      student_id: {
+        type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
       },
-      student_id: {
+      parent_id: {
         type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
       },
       is_to_all_parents: {
         type: DataTypes.TINYINT,
         defaultValue: 0,
-      },
-      is_active: {
-        type: DataTypes.TINYINT,
-        defaultValue: 1,
       },
       is_active: {
         type: DataTypes.TINYINT,
@@ -50,6 +46,7 @@ module.exports = (sequelize, DataTypes) => {
   NotificationTarget.associate = function(models) {
     NotificationTarget.belongsTo(models.Notify, { foreignKey: 'notify_id', as: 'notify_target' });
     NotificationTarget.belongsTo(models.KidStudent, { foreignKey: 'student_id', as: 'student' });
+    NotificationTarget.belongsTo(models.User, { foreignKey: 'parent_id', as: 'parent' });
   };
 
   return NotificationTarget;

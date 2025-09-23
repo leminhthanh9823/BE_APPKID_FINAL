@@ -1,0 +1,337 @@
+@startuml
+' Auto-generated PlantUML ERD for AppKid (from Mermaid ERD)
+
+entity users {
+  *id : bigint <<PK>>
+  role_id : int
+  name : varchar
+  email : varchar <<UK>>
+  image : varchar
+  email_verified_at : datetime
+  password : varchar
+  gender : varchar
+  status : tinyint
+  username : varchar <<UK>>
+  phone : varchar
+  dob : varchar
+  created_at : datetime
+  updated_at : datetime
+  reset_password_token : varchar
+  reset_password_expires : datetime
+  @startuml ERD_AppKid
+  ' Auto-generated PlantUML ERD for AppKid (from Mermaid ERD)
+
+  entity users {
+    *id : bigint <<PK>>
+    role_id : int
+    name : varchar
+    email : varchar <<UK>>
+    image : varchar
+    email_verified_at : datetime
+    password : varchar
+    gender : varchar
+    status : tinyint
+    username : varchar <<UK>>
+    phone : varchar
+    dob : varchar
+    created_at : datetime
+    updated_at : datetime
+    reset_password_token : varchar
+    reset_password_expires : datetime
+    refresh_token : varchar <<UK>>
+  }
+
+  entity reading_categories {
+    *id : int <<PK>>
+    title : varchar
+    description : text
+    image : varchar
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity kid_readings {
+    *id : bigint <<PK>>
+    title : varchar
+    reference : varchar
+    description : text
+    image : varchar
+    file : varchar
+    difficulty_level : int
+    category_id : int <<FK>>
+    is_active : tinyint
+    updated_at : datetime
+  }
+
+  entity kid_students {
+    *id : bigint <<PK>>
+    kid_parent_id : bigint <<FK>>
+    name : varchar
+    image : varchar
+    gender : varchar
+    dob : varchar
+    about : text
+    short_details : text
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity student_readings {
+    *id : bigint <<PK>>
+    kid_student_id : bigint <<FK>>
+    kid_reading_id : bigint <<FK>>
+    is_completed : tinyint
+    is_passed : tinyint
+    score : int
+    date_reading : datetime
+    star : double
+    duration : varchar
+    learning_path_id : bigint <<FK>>
+    game_id : bigint <<FK>>
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity student_reading_details {
+    *id : bigint <<PK>>
+    student_reading_id : bigint <<FK>>
+    question_id : bigint <<FK>>
+    student_answer : text
+    is_correct : tinyint
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity kid_questions {
+    *id : bigint <<PK>>
+    question_level_id : int <<FK>>
+    kid_reading_id : bigint <<FK>>
+    question : text
+    question_type : varchar
+    number_of_options : int
+    number_of_ans : int
+    number_of_qus : int
+    connection : varchar
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity kid_question_bank_options {
+    *id : bigint <<PK>>
+    kid_question_id : bigint <<FK>>
+    option : text
+    isCorrect : tinyint
+    type : int
+    key_position : int
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity learning_paths {
+    *id : bigint <<PK>>
+    name : varchar
+    description : text
+    image : varchar
+    difficulty_level : int
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity learning_path_category_items {
+    *id : bigint <<PK>>
+    learning_path_id : bigint <<FK>>
+    category_id : bigint <<FK>>
+    sequence_order : int
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity learning_path_items {
+    *id : bigint <<PK>>
+    learning_path_category_id : bigint <<FK>>
+    reading_id : bigint <<FK>>
+    game_id : bigint <<FK>>
+    sequence_order : int
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity games {
+    *id : bigint <<PK>>
+    image : varchar
+    name : varchar
+    description : text
+    type : int
+    prerequisite_reading_id : bigint <<FK>>
+    sequence_order : int
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity words {
+    *id : bigint <<PK>>
+    word : varchar
+    image : varchar
+    level : int
+    note : text
+    type : tinyint
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity game_words {
+    *id : bigint <<PK>>
+    game_id : bigint <<FK>>
+    word_id : bigint <<FK>>
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity e_libraries {
+    *id : int <<PK>>
+    title : varchar
+    reference : varchar
+    description : text
+    image : varchar
+    background : varchar
+    file : varchar
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity e_library_categories {
+    *id : int <<PK>>
+    title : varchar
+    description : text
+    image : varchar
+    icon : varchar
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity e_library_categories_relations {
+    *id : int <<PK>>
+    elibrary_id : int <<FK>>
+    elibrary_categories_id : int <<FK>>
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity student_e_libraries_relations {
+    *id : bigint <<PK>>
+    kid_student_id : bigint <<FK>>
+    kid_elibrary_id : bigint <<FK>>
+    is_completed : tinyint
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity feedback_categories {
+    *id : int <<PK>>
+    name : varchar
+    description : text
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity feedback {
+    *id : int <<PK>>
+    user_id : int <<FK>>
+    reading_id : int <<FK>>
+    comment : text
+    rating : int
+    is_important : tinyint
+    feedback_category_id : int <<FK>>
+    status : int
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity feedback_solve {
+    *id : int <<PK>>
+    feedback_id : int <<FK>>
+    solver_id : int <<FK>>
+    status_solve : int
+    comment_solve : text
+    confirmer_id : int <<FK>>
+    status_confirm : int
+    comment_confirm : text
+    deadline : datetime
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity notify {
+    *id : bigint <<PK>>
+    title : varchar
+    content : text
+    send_date : datetime
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity notify_target {
+    *id : bigint <<PK>>
+    notify_id : bigint <<FK>>
+    student_id : bigint <<FK>>
+    parent_id : bigint <<FK>>
+    is_to_all_parents : tinyint
+    is_active : tinyint
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  ' Relationships
+  users ||--o{ kid_students : "kid_parent_id"
+  reading_categories ||--o{ kid_readings : "category_id"
+  reading_categories ||--o{ learning_path_category_items : "category_id"
+  kid_readings ||--o{ kid_questions : "kid_reading_id"
+  kid_questions ||--o{ kid_question_bank_options : "kid_question_id"
+  kid_students ||--o{ student_readings : "kid_student_id"
+  kid_readings ||--o{ student_readings : "kid_reading_id"
+  student_readings ||--o{ student_reading_details : "student_reading_id"
+  kid_questions ||--o{ student_reading_details : "question_id"
+  learning_paths ||--o{ learning_path_category_items : "learning_path_id"
+  learning_path_category_items ||--o{ learning_path_items : "learning_path_category_id"
+  learning_paths ||--o{ student_readings : "learning_path_id"
+  kid_readings ||--o{ learning_path_items : "reading_id"
+  games ||--o{ learning_path_items : "game_id"
+  games ||--o{ student_readings : "game_id"
+  kid_readings ||--o{ games : "prerequisite_reading_id"
+  games ||--o{ game_words : "game_id"
+  words ||--o{ game_words : "word_id"
+  e_libraries ||--o{ e_library_categories_relations : "elibrary_id"
+  e_library_categories ||--o{ e_library_categories_relations : "elibrary_categories_id"
+  kid_students ||--o{ student_e_libraries_relations : "kid_student_id"
+  e_libraries ||--o{ student_e_libraries_relations : "kid_elibrary_id"
+  feedback_categories ||--o{ feedback : "feedback_category_id"
+  users ||--o{ feedback : "user_id"
+  kid_readings ||--o{ feedback : "reading_id"
+  feedback ||--o{ feedback_solve : "feedback_id"
+  users ||--o{ feedback_solve : "solver_id"
+  users ||--o{ feedback_solve : "confirmer_id"
+  notify ||--o{ notify_target : "notify_id"
+  kid_students ||--o{ notify_target : "student_id"
+  users ||--o{ notify_target : "parent_id"
+
+  @enduml

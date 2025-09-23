@@ -11,9 +11,6 @@ module.exports = (sequelize, DataTypes) => {
     kid_reading_id: {
       type: DataTypes.BIGINT.UNSIGNED,
     },
-    grade_id: {
-      type: DataTypes.BIGINT.UNSIGNED,
-    },
     question: {
       type: DataTypes.TEXT,
     },

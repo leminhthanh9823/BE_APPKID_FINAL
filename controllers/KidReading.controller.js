@@ -22,6 +22,22 @@ const formatDateToYYYYMMDD = (date) => {
 const sanitizeKidReadingData = (data) => {
   const sanitized = { ...data };
 
+  if (sanitized.grade_id !== undefined && sanitized.grade_id !== null) {
+    let gradeValue = sanitized.grade_id;
+    if (typeof gradeValue === "object" && gradeValue !== null) {
+      gradeValue =
+        gradeValue.value ||
+        gradeValue.id ||
+        gradeValue.grade_id ||
+        String(gradeValue);
+    }
+
+    sanitized.grade_id = parseInt(gradeValue);
+    if (isNaN(sanitized.grade_id)) {
+      delete sanitized.grade_id; 
+    }
+  }
+
   if (sanitized.is_active !== undefined) {
     let activeValue = sanitized.is_active;
     if (typeof activeValue === "object" && activeValue !== null) {
@@ -121,36 +137,27 @@ const parseCategoryIds = (reqBody) => {
 
 async function getAll(req, res) {
   try {
-    // Get params from both query and body
-    const params = {
-      ...req.query,
-      ...req.body
-    };
-
-    // Validate and sanitize input
-    const pageNumb = parseInt(params.pageNumb) || 1;
-    const pageSize = parseInt(params.pageSize) || 10;
-    const searchTerm = (params.searchTerm || "").toString().trim();
-    const sorts = params.sorts || null;
-    const is_active = params.is_active !== undefined ? 
-      (params.is_active === true || params.is_active === "true" || params.is_active === 1) : null;
-
-    // Calculate offset
-    const limit = Math.min(Math.max(pageSize, 1), 100); // Limit between 1-100
-    const offset = (Math.max(pageNumb, 1) - 1) * limit;
-
-    // Get data from repository without grade_id
-    const { count: total_record, rows: records } = await repository.findAllWithPaging(
-      offset,
-      limit,
-      searchTerm,
-      sorts,
-      is_active,
-      null,
-      null
-    );
-
-    // Transform records
+    const {
+      pageNumb = 1,
+      pageSize = 10,
+      searchTerm = "",
+      sorts = null,
+      is_active = null,
+      grade_id = null,
+    } = req.body || {};
+    const page = parseInt(pageNumb);
+    const limit = parseInt(pageSize);
+    const offset = (page - 1) * limit;
+    const { count: total_record, rows: records } =
+      await repository.findAllWithPaging(
+        offset,
+        limit,
+        searchTerm,
+        sorts,
+        is_active,
+        grade_id,
+        null
+      );
     const transformedRecords = records.map((record) => {
       const recordData = record.toJSON ? record.toJSON() : { ...record };
       return {
@@ -160,24 +167,17 @@ async function getAll(req, res) {
         updated_at: formatDateToYYYYMMDD(recordData.updated_at),
         categories: recordData.categories || [],
         category: recordData.categories?.[0] || null,
-        grades: recordData.grades || []
+        grades: recordData.grades || [],
       };
     });
-
-    // Calculate pagination
     const total_page = Math.ceil(total_record / limit);
-
     return messageManager.fetchSuccess("kidreading", {
       records: transformedRecords,
-      total_record,
-      total_page,
-      current_page: pageNumb,
-      page_size: limit
+      total_record: total_record,
+      total_page: total_page,
     }, res);
-
   } catch (error) {
-    console.error('Error in getAll kidreading:', error);
-    return messageManager.fetchFailed("kidreading", res, error.message);
+  return messageManager.fetchFailed("kidreading", res);
   }
 }
 
@@ -337,6 +337,7 @@ async function createKidReading(req, res) {
         transaction,
       });
       if (is_send_notify == true || is_send_notify == "true") {
+        let grade_id = await KidReadingRepository.findGradesByCategoryIds(categoryIdsToProcess)
         let sendDate = new Date(Date.now() + 60 * 1000);
         let newNotification = await db.Notify.create(
           {
@@ -349,11 +350,11 @@ async function createKidReading(req, res) {
           },
           { transaction }
         );
-        // let newTargets = await NotifyTargetRepository.createGradeNotification({
-        //   notification_id: newNotification.id,
-        //   grade_ids: [grade_id],
-        //   transaction: transaction,
-        // });
+        let newTargets = await NotifyTargetRepository.createGradeNotification({
+          notification_id: newNotification.id,
+          grade_ids: [grade_id],
+          transaction: transaction,
+        });
       }
       await transaction.commit();
       return messageManager.createSuccess("kidreading", created, res);
@@ -374,7 +375,7 @@ async function updateKidReading(req, res) {
       return messageManager.notFound("kidreading", res);
     }
     const sanitizedData = sanitizeKidReadingData(req.body);
-    const { title, is_active, description, reference } = sanitizedData;
+    const { title, grade_id, is_active, description, reference } = sanitizedData;
     const categoryIdsToProcess = parseCategoryIds(sanitizedData);
     const validationData = {
       ...sanitizedData,
@@ -408,6 +409,7 @@ async function updateKidReading(req, res) {
       : current.file;
     await repository.update(id, {
       title,
+      grade_id,
       description,
       is_active: is_active,
       image: imageUrl,
@@ -463,6 +465,7 @@ async function getKidReadingByCategory(req, res) {
       pageNumb = 1,
       pageSize = 10,
       searchTerm = "",
+      grade_id = null,
       is_active = null,
     } = req.body || {};
     if (!category_id || isNaN(category_id)) {
@@ -488,11 +491,16 @@ async function getKidReadingByCategory(req, res) {
         total_page: 0,
       }, res);
     }
+    // Nếu có grade_id, filter theo grade_id của ReadingCategory
     let includeCategories = {
       model: db.ReadingCategory,
       as: "category",
       attributes: ["id", "title", "description", "image"],
     };
+    if (grade_id !== null && grade_id !== undefined) {
+      includeCategories.where = { grade_id };
+      includeCategories.required = true;
+    }
     const { rows, count: total } = await db.KidReading.findAndCountAll({
       where: {
         ...whereClause,
@@ -530,6 +538,7 @@ async function getKidReadingByCategory(req, res) {
         categories: categories,
         category: category,
         categories_names: categories.map((cat) => cat.title).join(", "),
+        grades,
       };
     });
     const totalPage = Math.ceil(total / limit);
@@ -553,6 +562,27 @@ async function getListReading(req, res) {
       records: records.map((record) => ({
         id: record.id,
         title: record.title,
+        grade_id: record.grade_id,
+        image: record.image
+      })),
+    }, res);
+
+  }catch (error) {
+    return messageManager.fetchFailed("kidreading", res);
+  }
+}
+
+async function getListReading(req, res) {
+  try{
+    const { searchTerm = "" } = req.query || {};
+    const records = await repository.getAllActiveReadings(
+      searchTerm
+    );
+    return messageManager.fetchSuccess("kidreading", {
+      records: records.map((record) => ({
+        id: record.id,
+        title: record.title,
+        grade_id: record.grade_id,
         image: record.image
       })),
     }, res);

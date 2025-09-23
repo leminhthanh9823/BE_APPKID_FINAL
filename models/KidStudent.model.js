@@ -8,12 +8,6 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
       },
       kid_parent_id: DataTypes.BIGINT.UNSIGNED,
-      grade_id: DataTypes.BIGINT.UNSIGNED,
-      is_passed_survey: {
-        type: DataTypes.TINYINT,
-        allowNull: false,
-        defaultValue: 0,
-      },
       name: DataTypes.STRING(255),
       image: DataTypes.STRING(255),
       gender: DataTypes.STRING(255),

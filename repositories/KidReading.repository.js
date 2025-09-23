@@ -254,6 +254,7 @@ class KidReadingRepository {
     searchTerm,
     sorts,
     is_active,
+    grade_id,
     category_ids = null
   ) {
     const where = {};
@@ -278,6 +279,13 @@ class KidReadingRepository {
       if (category_ids && category_ids.length > 0) {
         includeCategories.where = {
           id: { [Op.in]: category_ids },
+        };
+        includeCategories.required = true;
+      }
+      if (grade_id !== null && grade_id !== undefined) {
+        includeCategories.where = {
+          ...(includeCategories.where || {}),
+          grade_id,
         };
         includeCategories.required = true;
       }
@@ -374,7 +382,24 @@ class KidReadingRepository {
     });
   }
 
-  // Method removed as grade functionality is no longer needed
+  async findGradesByCategoryIds(categoryIds) {
+    return this.withRetry(async () => {
+      const categories = await ReadingCategory.findAll({
+        where: {
+          id: { [Op.in]: categoryIds },
+        },
+        attributes: ['grade_id'],
+        group: ['grade_id'],
+        raw: true
+      });
+
+      const uniqueGrades = [...new Set(categories.map(cat => cat.grade_id))]
+        .filter(gradeId => gradeId !== null && gradeId !== undefined)
+        .sort((a, b) => a - b);
+
+      return uniqueGrades;
+    });
+  }
 
   async checkIsPracticed(readingId) {
     return this.withRetry(async () => {

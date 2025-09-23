@@ -9,6 +9,12 @@ class ReadingCategoryRepository {
     return ReadingCategory.findByPk(id);
   }
 
+  async findByGrade(grade_id) {
+    return ReadingCategory.findAll({
+      where: { grade_id, is_active: 1 },
+    });
+  }
+
   async create(data) {
     return ReadingCategory.create(data);
   }
@@ -65,11 +71,15 @@ class ReadingCategoryRepository {
     }
     return ReadingCategory.count({ where: whereClause });
   }
-  async findAllWithStatsAndPagination(offset, limit, searchTerm) {
+  async findAllWithStatsAndPagination(offset, limit, searchTerm, grade_id) {
     const whereClause = { is_active: 1 };
     
     if (searchTerm) {
       whereClause.title = { [Op.like]: `%${searchTerm}%` };
+    }
+    
+    if (grade_id) {
+      whereClause.grade_id = grade_id;
     }
 
     const categories = await ReadingCategory.findAll({
@@ -77,6 +87,7 @@ class ReadingCategoryRepository {
         'id',
         'title',
         'description',
+        'grade_id',
         'image',
         'is_active',
         'created_at',
@@ -117,6 +128,7 @@ class ReadingCategoryRepository {
       offset,
       limit,
       order: [
+        ['grade_id', 'ASC'],
         ['title', 'ASC']
       ]
     });
@@ -125,6 +137,7 @@ class ReadingCategoryRepository {
       id: category.id,
       title: category.title,
       description: category.description,
+      grade_id: category.grade_id,
       image: category.image,
       is_active: category.is_active,
       created_at: category.created_at,
@@ -140,11 +153,15 @@ class ReadingCategoryRepository {
     }));
   }
 
-  async countAllWithStats(searchTerm) {
+  async countAllWithStats(searchTerm, grade_id) {
     const whereClause = { is_active: 1 };
     
     if (searchTerm) {
       whereClause.title = { [Op.like]: `%${searchTerm}%` };
+    }
+    
+    if (grade_id) {
+      whereClause.grade_id = grade_id;
     }
 
     return ReadingCategory.count({ where: whereClause });
