@@ -91,11 +91,26 @@ class GameRepository {
 
   async getGameById(id) {
     return await Game.findByPk(id, {
-      include: [{
-        model: sequelize.models.KidReading,
-        as: 'prerequisiteReading',
-        attributes: ['id', 'title']
-      }]
+      include: [
+        {
+          model: sequelize.models.KidReading,
+          as: 'prerequisiteReading',
+          attributes: ['id', 'title', 'description', 'image', 'level', 'is_active']
+        },
+        {
+          model: Word,
+          through: {
+            model: GameWord,
+            attributes: ['sequence_order']
+          },
+          as: 'Words',
+          attributes: ['id', 'word', 'note', 'image', 'level', 'type', 'is_active'],
+          required: false
+        }
+      ],
+      order: [
+        [{ model: Word, as: 'Words' }, GameWord, 'sequence_order', 'ASC']
+      ]
     });
   }
 

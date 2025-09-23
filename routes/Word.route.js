@@ -35,20 +35,6 @@ router.get('/',
   WordController.listWords
 );
 
-// Excel template and import routes
-router.get('/template',
-  jwtMiddleware,
-  adminOrTeacher,
-  WordController.downloadTemplate
-);
-
-router.post('/import',
-  jwtMiddleware,
-  adminOrTeacher,
-  upload.single('file'),
-  WordController.importFromExcel
-);
-
 // Routes for word assignments
 router.post('/game/:gameId/words',
   jwtMiddleware,
