@@ -271,15 +271,20 @@ async function getByCategoryAndStudentId(req, res) {
 
 async function createKidReading(req, res) {
   try {
-     const {
+    const {
       title,
       is_active,
       description,
       reference,
       category_id,
+      difficulty_level
     } = req.body;
     const sanitizedData = sanitizeKidReadingData({title, is_active, description, reference, category: category_id});
-   
+    // Sanitize difficulty_level if it's an object
+    let sanitizedDifficulty = difficulty_level;
+    if (sanitizedDifficulty && typeof sanitizedDifficulty === 'object' && sanitizedDifficulty.value !== undefined) {
+      sanitizedDifficulty = sanitizedDifficulty.value;
+    }
     const validationError = validateKidReadingData(sanitizedData);
     if (validationError) {
       return messageManager.validationFailed("kidreading", res, validationError);
@@ -313,13 +318,13 @@ async function createKidReading(req, res) {
     const created = await repository.create({
       title,
       description,
+      difficulty_level: sanitizedDifficulty,
       is_active: is_active,
       image: imageUrl,
       file: fileUrl,
       reference: reference || null,
       category_id: category_id,
     });
-  
     await transaction.commit();
     return messageManager.createSuccess("kidreading", created, res);
   } catch (error) {
@@ -335,7 +340,10 @@ async function updateKidReading(req, res) {
       return messageManager.notFound("kidreading", res);
     }
     const sanitizedData = sanitizeKidReadingData(req.body);
-    const { title, is_active, description, reference, category } = sanitizedData;
+    let { title, is_active, description, reference, category, difficulty_level } = sanitizedData;
+    if (difficulty_level && typeof difficulty_level === 'object' && difficulty_level.value !== undefined) {
+      difficulty_level = difficulty_level.value;
+    }
     const validationError = validateKidReadingData(sanitizedData, true);
     if (validationError) {
       return messageManager.validationFailed("kidreading", res, validationError);
@@ -358,6 +366,7 @@ async function updateKidReading(req, res) {
     await repository.update(id, {
       title,
       description,
+      difficulty_level,
       is_active: is_active,
       image: imageUrl,
       file: fileUrl,
