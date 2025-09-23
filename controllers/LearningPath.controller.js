@@ -810,6 +810,16 @@ async function getItemsInCategory(req, res) {
   }
 }
 
+async function getLearningPathsForMobile(req, res) {
+  try {
+    const learningPaths = await repository.findAllForMobile();
+    return messageManager.fetchSuccess("learningpath", { record: learningPaths }, res);
+  } catch (error) {
+    console.error("Get learning paths for mobile error:", error);
+    return messageManager.fetchFailed("learningpath", res, error.message);
+  }
+}
+
 module.exports = {
   getAllLearningPaths,
   toggleStatus,
@@ -822,5 +832,6 @@ module.exports = {
   deleteReadingFromPath,
   deleteGameFromPath,
   getCategoriesInLearningPath,
-  getItemsInCategory
+  getItemsInCategory,
+  getLearningPathsForMobile
 };
