@@ -228,50 +228,6 @@ class WordRepository {
     }
   }
 
-  async bulkImportWords(words) {
-    const transaction = await sequelize.transaction();
-    
-    try {
-      const results = {
-        imported: 0,
-        skipped: 0,
-        failed: 0,
-        errors: []
-      };
-
-      for (const wordData of words) {
-        try {
-          // Check for existing word
-          const existingWord = await this.findByWordText(wordData.word);
-          if (existingWord) {
-            results.skipped++;
-            continue;
-          }
-
-          // Create new word
-          await Word.create({
-            ...wordData,
-            is_active: true
-          }, { transaction });
-          
-          results.imported++;
-        } catch (error) {
-          results.failed++;
-          results.errors.push({
-            word: wordData.word,
-            error: error.message
-          });
-        }
-      }
-
-      await transaction.commit();
-      return results;
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
-  }
-
   async removeWordsFromGame(gameId) {
     const transaction = await sequelize.transaction();
     

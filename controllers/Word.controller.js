@@ -1,7 +1,6 @@
 const wordRepository = require('../repositories/Word.repository');
 const messageManager = require('../helpers/MessageManager.helper');
 const { validateKidReadingFiles } = require('../helpers/FileValidation.helper');
-const { parseWordExcel, validateExcelWordData, generateWordTemplate } = require('../helpers/ExcelImport.helper');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
 
 const validateWordData = (data, isUpdate = false) => {
@@ -317,64 +316,6 @@ async function getWordsByGameMobile(req, res) {
   }
 }
 
-async function downloadTemplate(req, res) {
-  try {
-    const buffer = generateWordTemplate();
-    
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=word_import_template.xlsx');
-    res.setHeader('Content-Length', buffer.length);
-    
-    res.send(buffer);
-  } catch (error) {
-    console.error('Error in downloadTemplate:', error);
-    return messageManager.fetchFailed('word', res, 'Failed to generate template');
-  }
-}
-
-async function importFromExcel(req, res) {
-  try {
-    if (!req.file) {
-      return messageManager.validationFailed('word', res, 'Excel file is required');
-    }
-
-    if (!req.file.mimetype.includes('spreadsheet')) {
-      return messageManager.validationFailed('word', res, 'Invalid file type. Please upload an Excel file');
-    }
-
-    // Parse Excel file
-    const words = parseWordExcel(req.file.buffer);
-    
-    if (!words.length) {
-      return messageManager.validationFailed('word', res, 'No valid words found in Excel file');
-    }
-
-    // Validate each word
-    const validationErrors = [];
-    for (const [index, word] of words.entries()) {
-      const error = validateExcelWordData(word);
-      if (error) {
-        validationErrors.push(`Row ${index + 2}: ${error}`);
-      }
-    }
-
-    if (validationErrors.length > 0) {
-      return messageManager.validationFailed('word', res, `Validation errors in Excel file: ${validationErrors.join(', ')}`);
-    }
-
-    // Import words
-    const result = await wordRepository.bulkImportWords(words);
-    
-    return messageManager.createSuccess('word', {
-      total: words.length,
-      ...result
-    }, res);
-  } catch (error) {
-    console.error('Error in importFromExcel:', error);
-    return messageManager.createFailed('word', res, 'Failed to import words');
-  }
-}
-
 module.exports = {
   createWord,
   updateWord,
@@ -384,7 +325,5 @@ module.exports = {
   assignWordsToGame,
   removeWordsFromGame,
   getWordsByGame,
-  downloadTemplate,
-  importFromExcel,
   getWordsByGameMobile
 };
