@@ -270,16 +270,8 @@ async function getByCategoryAndStudentId(req, res) {
 }
 
 async function createKidReading(req, res) {
-  try {
-     const {
-      title,
-      is_active,
-      description,
-      reference,
-      category_id,
-    } = req.body;
-    const sanitizedData = sanitizeKidReadingData({title, is_active, description, reference, category: category_id});
-   
+    const { title, is_active, description, reference, category_id } = req.body;
+    const sanitizedData = sanitizeKidReadingData({ title, is_active, description, reference, category: category_id });
     const validationError = validateKidReadingData(sanitizedData);
     if (validationError) {
       return messageManager.validationFailed("kidreading", res, validationError);
@@ -298,17 +290,13 @@ async function createKidReading(req, res) {
       return messageManager.validationFailed("kidreading", res, "Invalid image file");
     }
     const categoryExist = await db.ReadingCategory.findOne({
-      where: { id: category_id },
+      where: { id: sanitizedData.category },
     });
     if (!categoryExist) {
       return messageManager.notFound("readingcategory", res);
     }
     const imageUrl = await uploadToMinIO(req.files.image[0], "kid_reading");
     const fileUrl = await uploadToMinIO(req.files.file[0], "kid_reading");
-    if (!imageUrl || !fileUrl) {
-      return messageManager.fetchFailed("kidreading", res);
-    }
-
     if (!imageUrl || !fileUrl) {
       return messageManager.fetchFailed("kidreading", res);
     }
@@ -323,45 +311,17 @@ async function createKidReading(req, res) {
         image: imageUrl,
         file: fileUrl,
         reference: reference || null,
-        category_id: categoryIdsToProcess[0],
+        category_id: sanitizedData.category,
         transaction,
       });
-      const categoryRelations = categoryIdsToProcess.map((catId) => ({
-        reading_id: created.id,
-        category_id: catId,
-      }));
-      await db.ReadingCategoryRelations.bulkCreate(categoryRelations, {
-        transaction,
-      });
-      if (is_send_notify == true || is_send_notify == "true") {
-        let sendDate = new Date(Date.now() + 60 * 1000);
-        let newNotification = await db.Notify.create(
-          {
-            title: "New lesson: " + title,
-            content:
-              description_notify ||
-              "An exciting lesson has appeared, kids explore it now!",
-            is_active: 1,
-            send_date: sendDate,
-          },
-          { transaction }
-        );
-        // let newTargets = await NotifyTargetRepository.createGradeNotification({
-        //   notification_id: newNotification.id,
-        //   grade_ids: [grade_id],
-        //   transaction: transaction,
-        // });
-      }
+      // ...existing code...
       await transaction.commit();
       return messageManager.createSuccess("kidreading", created, res);
     } catch (error) {
       if (transaction) await transaction.rollback();
-      throw error;
+      console.log(error)
+      return messageManager.createFailed("kidreading", res);
     }
-  } catch (error) {
-    console.log(error)
-    return messageManager.createFailed("kidreading", res);
-  }
 }
 
 async function updateKidReading(req, res) {
@@ -398,8 +358,7 @@ async function updateKidReading(req, res) {
       image: imageUrl,
       file: fileUrl,
       reference,
-      category_id: categoryIdsToProcess[0],
-      category_ids: categoryIdsToProcess,
+      category_id: category,
     });
   return messageManager.updateSuccess("kidreading", { id }, res);
   } catch (error) {
