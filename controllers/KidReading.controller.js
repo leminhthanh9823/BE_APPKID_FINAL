@@ -90,6 +90,7 @@ async function getAll(req, res) {
     const is_active = params.is_active ?? null;
 
     const category_id = params.category_id ? parseInt(params.category_id) : null;
+    const difficulty_level = params.difficulty_level ? parseInt(params.difficulty_level) : null;
     // Calculate offset
     const limit = Math.min(Math.max(pageSize, 1), 100); // Limit between 1-100
     const offset = (Math.max(pageNumb, 1) - 1) * limit;
@@ -100,6 +101,7 @@ async function getAll(req, res) {
       searchTerm,
       sorts,
       is_active,
+      difficulty_level,
       category_id
     );
 

@@ -218,6 +218,7 @@ class KidReadingRepository {
     searchTerm,
     sorts,
     is_active = null,
+    difficulty_level = null,
     category_id = null
   ) {
 
@@ -233,6 +234,10 @@ class KidReadingRepository {
 
     if (category_id !== null && category_id !== undefined) {
       where.category_id = category_id;
+    }
+
+    if (difficulty_level !== null && difficulty_level !== undefined) {
+      where.difficulty_level = difficulty_level;
     }
 
     const order = sorts
