@@ -1,4 +1,4 @@
-const { StudentReading, KidReading } = require('../models');
+const { StudentReading, KidReading, LearningPath, LearningPathCategoryItem, ReadingCategory, LearningPathItem } = require('../models');
 const { fn, col, Op } = require('sequelize');
 class StudentReadingRepository {
   async getScoreByStudentAndReading(kid_student_id, kid_reading_id) {
@@ -223,6 +223,131 @@ class StudentReadingRepository {
       };
     } catch (error) {
       console.error('Error saving game result:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lấy tổng số star của học sinh theo từng category trong một learning path
+   */
+  async getStarsByLearningPathCategories(kid_student_id, learning_path_id) {
+    try {
+      // Lấy learning path và các categories của nó
+      const learningPath = await LearningPath.findOne({
+        where: { 
+          id: learning_path_id,
+          is_active: 1
+        },
+        include: [{
+          model: LearningPathCategoryItem,
+          as: 'categoryItems',
+          attributes: ['id', 'category_id', 'sequence_order'],
+          include: [
+            {
+              model: ReadingCategory,
+              as: 'category',
+              attributes: ['id', 'title']
+            },
+            {
+              model: LearningPathItem,
+              as: 'items',
+              attributes: ['id', 'reading_id', 'game_id'],
+              where: { is_active: 1 },
+              required: false
+            }
+          ]
+        }],
+        order: [
+          [{ model: LearningPathCategoryItem, as: 'categoryItems' }, 'sequence_order', 'ASC']
+        ]
+      });
+
+      if (!learningPath) {
+        throw new Error('Learning path not found');
+      }
+
+      // Lấy tất cả reading_ids và game_ids từ learning path items
+      const allItems = learningPath.categoryItems.reduce((acc, category) => {
+        const items = category.items || [];
+        items.forEach(item => {
+          if (item.reading_id) acc.readingIds.add(item.reading_id);
+          if (item.game_id) acc.gameIds.add(item.game_id);
+        });
+        return acc;
+      }, { readingIds: new Set(), gameIds: new Set() });
+
+      // Lấy student readings cho tất cả readings với số star cao nhất
+      const readingStars = await StudentReading.findAll({
+        where: {
+          kid_student_id,
+          kid_reading_id: { [Op.in]: [...allItems.readingIds] },
+          learning_path_id
+        },
+        attributes: [
+          'kid_reading_id',
+          [fn('MAX', col('star')), 'max_star']
+        ],
+        group: ['kid_reading_id'],
+        raw: true
+      });
+
+      // Lấy student readings cho tất cả games với số star cao nhất
+      const gameStars = await StudentReading.findAll({
+        where: {
+          kid_student_id,
+          game_id: { [Op.in]: [...allItems.gameIds] },
+          learning_path_id
+        },
+        attributes: [
+          'game_id',
+          [fn('MAX', col('star')), 'max_star']
+        ],
+        group: ['game_id'],
+        raw: true
+      });
+
+      // Map để lưu trữ stars cao nhất theo reading/game
+      const starsMap = new Map();
+      readingStars.forEach(reading => {
+        if (reading.kid_reading_id) {
+          starsMap.set(reading.kid_reading_id, parseFloat(reading.max_star) || 0);
+        }
+      });
+      gameStars.forEach(game => {
+        if (game.game_id) {
+          starsMap.set(game.game_id, parseFloat(game.max_star) || 0);
+        }
+      });
+
+      // Tính tổng star cho mỗi category
+      const categoryStats = learningPath.categoryItems.map(categoryItem => {
+        const items = categoryItem.items || [];
+        const totalStars = items.reduce((sum, item) => {
+          const itemId = item.game_id || item.reading_id;
+          return sum + (starsMap.get(itemId) || 0);
+        }, 0);
+
+        return {
+          category_id: categoryItem.category_id,
+          category_name: categoryItem.category?.title || 'Unknown',
+          total_stars: totalStars,
+          total_items: items.length,
+          items_with_stars: items.filter(item => 
+            starsMap.has(item.game_id || item.reading_id)
+          ).length
+        };
+      });
+
+      return {
+        learning_path_id: learningPath.id,
+        learning_path_name: learningPath.name,
+        categories: categoryStats,
+        total_stars: categoryStats.reduce((sum, cat) => sum + cat.total_stars, 0),
+        total_items: categoryStats.reduce((sum, cat) => sum + cat.total_items, 0),
+        completed_items: categoryStats.reduce((sum, cat) => sum + cat.items_with_stars, 0)
+      };
+    } catch (error) {
+      console.error('Error in getStarsByLearningPathCategories:', error);
       throw error;
     }
   }
