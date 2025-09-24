@@ -143,7 +143,7 @@ const getById = async (req, res) => {
         {
           model: db.ReadingCategory,
           as: "category",
-          attributes: ["id", "name", "description", "image"],
+          attributes: ["id", "title", "description", "image"],
         }
       ],
       attributes: [
@@ -170,7 +170,7 @@ const getById = async (req, res) => {
     }
 
     // Get question count for this reading
-    const questionCount = await db.kid_questions.count({
+    const questionCount = await db.Question.count({
       where: { 
         kid_reading_id: id,
         is_active: 1

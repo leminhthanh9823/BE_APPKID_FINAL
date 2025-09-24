@@ -91,7 +91,7 @@ async function getReportByStudent(req, res) {
 
 async function createStudentReading(req, res) {
   try {
-    const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id } =
+    const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id, game_id } =
       req.body;
     const newRecord = await repository.create({
       kid_student_id,
@@ -99,6 +99,7 @@ async function createStudentReading(req, res) {
       score,
       is_completed,
       duration,
+      game_id,
       learning_path_id
     });
     res.json({

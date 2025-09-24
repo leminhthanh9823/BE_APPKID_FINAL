@@ -25,6 +25,7 @@ const StudentAdviceRoute = require("./routes/StudentAdvice.route");
 const LearningPathRoute = require("./routes/learningPath.routes");
 const GameRoute = require("./routes/Game.route");
 const WordRoute = require("./routes/Word.route");
+const StudentStarsRoute = require("./routes/studentStars.route");
 app.use(express.json({ limit: "400mb" })); // Reduced from 400mb
 
 app.use(cors());
@@ -52,6 +53,7 @@ app.use("/api/student-advice", StudentAdviceRoute);
 app.use("/api/learning-path", LearningPathRoute);
 app.use("/api/game", GameRoute);
 app.use("/api/word", WordRoute);
+app.use("/api/student-stars", StudentStarsRoute);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
