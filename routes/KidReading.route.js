@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/KidReading.controller.js");
 const jwtMiddleware = require("../middlewares/Auth.middleware.js");
 const upload = require("../middlewares/File.middleware.js");
-const { adminOrTeacher } = require("../middlewares/Role.middleware.js");
+const { adminOrTeacher, teacherOnly } = require("../middlewares/Role.middleware.js");
 
 const readingFileUpload = upload.fields([
   { name: "image", maxCount: 1 },
@@ -57,6 +57,8 @@ router.post(
 // API cho UC_LP04 - Get available readings by category
 //cms
 router.get("/:categoryId/available-readings", 
+  jwtMiddleware,
+  teacherOnly,
   controller.getAvailableReadingsByCategory
 );
 

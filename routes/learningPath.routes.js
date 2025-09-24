@@ -57,12 +57,12 @@ router.post(
   learningPathController.getItemsInLearningPath
 );
 
-// POST /:pathId/add-items - Thêm readings vào learning path
+// POST /:pathId/add-readings - Thêm readings vào learning path
 router.post(
-  "/:id/add-items",
+  "/:id/add-readings",
   jwtMiddleware,
   teacherOnly,
-  learningPathController.addItemsToLearningPath
+  learningPathController.addReadingsToLearningPath
 );
 
 // PUT /:id/categories/reorder - Sắp xếp lại thứ tự categories
@@ -83,7 +83,7 @@ router.put(
 
 // DELETE /:pathId/readings/:readingId - Xóa reading khỏi learning path
 router.delete(
-  "/:pathId/readings/:readingId",
+  "/:pathId/reading/:readingId",
   jwtMiddleware,
   teacherOnly,
   learningPathController.deleteReadingFromPath
@@ -91,7 +91,7 @@ router.delete(
 
 // DELETE /:pathId/games/:gameId - Xóa game khỏi learning path
 router.delete(
-  "/:pathId/games/:gameId",
+  "/:pathId/game/:gameId",
   jwtMiddleware,
   teacherOnly,
   learningPathController.deleteGameFromPath
@@ -110,5 +110,20 @@ router.get(
   learningPathController.getItemsInLearningPathForMobile
 );
 
+// cms
+router.get(
+  "/category/:pathCategoryId/items",
+  jwtMiddleware,
+  teacherOnly,
+  learningPathController.getItemsByCategoryIdInLearningPath
+);
+
+// cms
+router.post(
+  '/:pathId/:pathCategoryId/:readingId/add-games',
+  jwtMiddleware,
+  teacherOnly,
+  learningPathController.addGamesToLearningPath
+);
 
 module.exports = router;

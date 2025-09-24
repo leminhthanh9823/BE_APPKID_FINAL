@@ -88,10 +88,11 @@ class MessageManager {
     return res ? res.status(200).json(response) : response;
   }
 
-  deleteSuccess(entity, res) {
+  deleteSuccess(entity, res, data = null) {
     const response = this.createResponse(
       true,
-      this.getMessage("Delete", entity, "success")
+      this.getMessage("Delete", entity, "success"),
+      data
     );
     return res ? res.status(200).json(response) : response;
   }
