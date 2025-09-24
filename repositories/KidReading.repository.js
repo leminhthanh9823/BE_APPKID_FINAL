@@ -179,6 +179,7 @@ class KidReadingRepository {
     is_active,
     image,
     file,
+    difficulty_level,
     reference,
     category_id,
   }) {
@@ -189,6 +190,7 @@ class KidReadingRepository {
         is_active,
         image,
         file,
+        difficulty_level,
         reference,
         category_id,
       },
@@ -197,6 +199,8 @@ class KidReadingRepository {
   }
 
   async update(id, data) {
+    console.log(data);
+    
     return this.withRetry(async () => {
       return await KidReading.update(data, { where: { id } });
     });
@@ -257,6 +261,7 @@ class KidReadingRepository {
           id: readingData.id,
           title: readingData.title,
           description: readingData.description,
+          difficulty_level: readingData.difficulty_level,
           image: readingData.image,
           file: readingData.file,
           reference: readingData.reference,
