@@ -1,4 +1,4 @@
-const { Game, GameWord, Word, sequelize } = require('../models');
+const { Game, GameWord, Word, LearningPathItem, LearningPathCategoryItem, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 class GameRepository {
@@ -568,6 +568,59 @@ class GameRepository {
         throw fallbackError;
       }
     }
+  }
+
+  async getActiveGamesByReadingId(readingId) {
+    const games = await Game.findAll({
+      where: {
+        prerequisite_reading_id: readingId,
+        is_active: 1
+      },
+      attributes: ['id', 'name', 'description', 'type', 'image', 'sequence_order', 'is_active'],
+      include: [
+        {
+          model: LearningPathItem,
+          as: 'learning_path_items',
+          attributes: ['learning_path_category_id'],
+          required: false,
+          include: [
+            {
+              model: LearningPathCategoryItem,
+              as: 'learningPathCategory',
+              attributes: ['learning_path_id'],
+              required: false
+            }
+          ]
+        }
+      ],
+      order: [['sequence_order', 'ASC']]
+    });
+
+    return games.map(game => {
+      const gameJson = game.toJSON();
+      
+      let learningPathId = null;
+      
+      if (gameJson.learning_path_items && gameJson.learning_path_items.length > 0) {
+        for (const item of gameJson.learning_path_items) {
+          if (item.learningPathCategory && item.learningPathCategory.learning_path_id) {
+            learningPathId = item.learningPathCategory.learning_path_id;
+            break;
+          }
+        }
+      }
+
+      const { name, ...rest } = gameJson;
+      const result = {
+        ...rest,
+        title: name,
+        availability_learning_path_id: learningPathId,
+        availability_name: learningPathId ? 'In Learning Path' : null
+      };
+
+      delete result.learning_path_items;
+      return result;
+    });
   }
 }
 

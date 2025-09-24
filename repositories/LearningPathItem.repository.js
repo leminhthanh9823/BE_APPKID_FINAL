@@ -393,6 +393,144 @@ class LearningPathItemRepository {
         category_id: gameItem.learningPathCategory.category_id
       };
   }
+
+  /**
+   * Thêm games vào learning path theo reading cụ thể
+   * Games sẽ được thêm vào cuối các games hiện tại của reading đó
+   * Và các items phía sau sẽ được đẩy lùi lại
+   */
+  async addGamesToLearningPath(pathId, pathCategoryId, readingId, numericGameIds, transaction) {
+    try {
+      const options = { transaction };
+
+      // 1. Verify learning path category exists
+      const pathCategory = await db.LearningPathCategoryItem.findOne({
+        where: { 
+          id: pathCategoryId,
+          learning_path_id: pathId
+        },
+        ...options
+      });
+
+      if (!pathCategory) {
+        throw new Error('Learning path category not found');
+      }
+
+      // 2. Verify reading exists in this category
+      const readingItem = await db.LearningPathItem.findOne({
+        where: { 
+          reading_id: readingId,
+          learning_path_category_id: pathCategoryId
+        },
+        ...options
+      });
+
+      if (!readingItem) {
+        throw new Error('Reading not found in this learning path category');
+      }
+
+      // 3. Verify all games exist and have correct prerequisite_reading_id
+      const games = await db.Game.findAll({
+        where: { 
+          id: { [Op.in]: numericGameIds },
+          prerequisite_reading_id: readingId,
+          is_active: 1
+        },
+        attributes: ['id', 'name', 'prerequisite_reading_id'],
+        ...options
+      });
+
+      if (games.length !== numericGameIds.length) {
+        const foundGameIds = games.map(g => g.id);
+        const missingGameIds = numericGameIds.filter(id => !foundGameIds.includes(id));
+        throw new Error(`Games not found or invalid prerequisite: ${missingGameIds.join(', ')}`);
+      }
+
+      // 5. Get all current items (readings + games) in this category, ordered by sequence_order
+      const currentItems = await db.LearningPathItem.findAll({
+        where: { learning_path_category_id: pathCategoryId },
+        attributes: ['id', 'reading_id', 'game_id', 'sequence_order'],
+        include: [
+          {
+            model: db.KidReading,
+            as: 'reading',
+            attributes: ['id', 'title'],
+            required: false
+          },
+          {
+            model: db.Game,
+            as: 'game',
+            attributes: ['id', 'prerequisite_reading_id'],
+            required: false
+          }
+        ],
+        order: [['sequence_order', 'ASC']],
+        ...options
+      });
+
+      // 6. Find the insertion point: after the last game belonging to the specified reading
+      let insertionPoint = readingItem.sequence_order;
+      
+      // Filter to find all games that belong to this specific reading (prerequisite_reading_id matches)
+      const currentReadingGames = currentItems.filter(item => 
+        item.game && item.game.prerequisite_reading_id === readingId
+      );
+      
+      // If there are existing games for this reading, insert after the last one
+      if (currentReadingGames.length > 0) {
+        const lastGameSequence = Math.max(...currentReadingGames.map(item => item.sequence_order));
+        insertionPoint = lastGameSequence;
+      }
+      // Otherwise, insert right after the reading itself
+
+      // 7. Shift all items (readings + games) after insertion point to make space for new games
+      const itemsToShift = currentItems.filter(item => item.sequence_order > insertionPoint);
+      
+      const shiftPromises = itemsToShift.map((item) => {
+        const newSequenceOrder = item.sequence_order + numericGameIds.length;
+        return db.LearningPathItem.update(
+          { sequence_order: newSequenceOrder },
+          { 
+            where: { id: item.id },
+            ...options
+          }
+        );
+      });
+
+      await Promise.all(shiftPromises);
+
+      // 8. Insert new games
+      const newGameItems = [];
+      for (let i = 0; i < numericGameIds.length; i++) {
+        const gameId = numericGameIds[i];
+        const sequenceOrder = insertionPoint + i + 1;
+        
+        const newItem = await db.LearningPathItem.create({
+          learning_path_category_id: pathCategoryId,
+          reading_id: null,
+          game_id: gameId,
+          sequence_order: sequenceOrder,
+          is_active: 1
+        }, options);
+        
+        newGameItems.push({
+          id: newItem.id,
+          game_id: gameId,
+          sequence_order: sequenceOrder
+        });
+      }
+
+      return {
+        added_games: newGameItems,
+        insertion_after_sequence: insertionPoint,
+        shifted_items_count: itemsToShift.length,
+        category_id: pathCategory.category_id
+      };
+
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = new LearningPathItemRepository();

@@ -51,4 +51,8 @@ router.get('/games/:id',
   gameController.detail
 );
 
+router.get('/reading/:readingId/games', 
+  gameController.getListGameInReadingForPath
+)
+
 module.exports = router;

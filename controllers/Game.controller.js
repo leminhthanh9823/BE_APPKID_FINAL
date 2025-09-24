@@ -328,6 +328,17 @@ class GameController {
       return messageManager.updateFailed('game', res, error.message);
     }
   }
+
+  async getListGameInReadingForPath(req, res) {
+    try {
+      const { readingId } = req.params;
+      const games = await gameRepository.getActiveGamesByReadingId(readingId);
+      return messageManager.fetchSuccess('games', games, res);
+    } catch (error) {
+      console.error('Get games for learning path error:', error);
+      return messageManager.fetchFailed('games', res, error.message);
+    }
+  }
 }
 
 module.exports = new GameController();

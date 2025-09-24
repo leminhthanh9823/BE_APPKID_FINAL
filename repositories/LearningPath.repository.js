@@ -195,6 +195,7 @@ class LearningPathRepository {
     if (search && search.trim()) {
       gameWhereClause.name = { [Op.like]: `%${search.trim()}%` };
     }
+
     if (statusFilter === 'Active') {
       gameWhereClause.is_active = 1;
     } else if (statusFilter === 'Inactive') {
@@ -207,7 +208,7 @@ class LearningPathRepository {
     // Query categories and items with proper includes and filters
     const categories = await db.LearningPathCategoryItem.findAll({
       where: categoryItemWhereClause,
-      attributes: ['category_id', 'sequence_order'],
+      attributes: ['id', 'category_id', 'sequence_order'], // Thêm id để lấy learning_path_category_item_id
       include: [
         {
           model: db.ReadingCategory,
@@ -219,7 +220,7 @@ class LearningPathRepository {
           model: db.LearningPathItem, 
           as: 'items',
           required: false,
-          attributes: ['id', 'sequence_order', 'reading_id', 'game_id', 'is_active'],
+          attributes: ['id', 'sequence_order', 'reading_id', 'game_id', 'is_active', 'learning_path_category_id'], // Thêm learning_path_category_id
           include: [
             {
               model: db.KidReading,
@@ -241,7 +242,6 @@ class LearningPathRepository {
         [{ model: db.LearningPathItem, as: 'items' }, 'sequence_order', 'ASC']
       ]
     });
-
     return {
       learningPath: learningPath.toJSON(),
       categories,
@@ -420,21 +420,21 @@ class LearningPathRepository {
         transaction
       );
 
-        await transaction.commit();
+      await transaction.commit();
 
-        return {
-          success: true,
-          message: 'Categories reordered successfully',
-          updated_categories: updatedCategories.map(item => ({
-            category_id: item.category_id,
-            new_sequence_order: item.sequence_order
-          }))
-        };
+      return {
+        success: true,
+        message: 'Categories reordered successfully',
+        updated_categories: updatedCategories.map(item => ({
+          category_id: item.category_id,
+          new_sequence_order: item.sequence_order
+        }))
+      };
 
-      } catch (error) {
-        await transaction.rollback();
-        throw error;
-      }
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   }
 
 
@@ -452,7 +452,7 @@ class LearningPathRepository {
      * @param {number} studentId - ID của học sinh
      * @returns {Object} Thông tin learning path với categories và items có logic unlock
      */
-    async findItemsInLearningPathForMobile(pathId, studentId) {
+  async findItemsInLearningPathForMobile(pathId, studentId) {
       // Execute all initial queries in parallel for better performance
       const [learningPath, categoriesWithItems, studentReadings] = await Promise.all([
         // 1. Get learning path info
