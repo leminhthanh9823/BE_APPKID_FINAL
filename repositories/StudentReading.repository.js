@@ -31,7 +31,7 @@ class StudentReadingRepository {
   }
 
   async create(data) {
-    const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id } = data;
+    const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id, game_id } = data;
 
     const newRecord = await StudentReading.create({
       kid_student_id: kid_student_id,
@@ -42,7 +42,8 @@ class StudentReadingRepository {
       date_reading: new Date(),
       star: score || 0,
       duration: duration || 0,
-      learning_path_id: learning_path_id || null
+      learning_path_id: learning_path_id || null,
+      game_id: game_id || null
     });
 
     return newRecord;
