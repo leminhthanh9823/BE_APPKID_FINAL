@@ -531,6 +531,47 @@ class LearningPathItemRepository {
       throw error;
     }
   }
+
+  /**
+   * kiểm tra reading có thuộc learning path nào không
+   */
+  async checkReadingInLearningPath(readingId) {
+    const readingItem = await db.LearningPathItem.findOne({
+      where: { reading_id: readingId },
+      include: [
+        {
+          model: db.LearningPathCategoryItem,
+          as: 'learningPathCategory',
+          attributes: ['id', 'learning_path_id'],
+          include: [
+            {
+              model: db.LearningPath,
+              as: 'learningPath',
+              attributes: ['id', 'name']
+            }
+          ]
+        }
+      ]
+    });
+    if(readingItem === null 
+      || readingItem.learningPathCategory === null 
+      || readingItem.learningPathCategory.learningPath === null) {
+
+      return null;
+    }
+    // tôi muốn trả về readingId, pathId, pathName và learningPathCategoryId
+    const pathId = readingItem.learningPathCategory.learningPath.id;
+    const pathName = readingItem.learningPathCategory.learningPath.name;
+    const pathCategoryId = readingItem.learningPathCategory.id;
+
+    return {
+      readingId,
+      pathCategoryId,
+      pathId,
+      pathName,
+    };
+  }
+
 }
 
 module.exports = new LearningPathItemRepository();

@@ -1,5 +1,6 @@
-const { Game, GameWord, Word, LearningPathItem, LearningPathCategoryItem, sequelize } = require('../models');
+const { Game, GameWord, Word, LearningPathItem, LearningPathCategoryItem, LearningPath,StudentReading,  sequelize } = require('../models');
 const { Op } = require('sequelize');
+const LearningPathItemRepository = require('./LearningPathItem.repository');
 
 class GameRepository {
   async findGameByNameAndReadingId(name, readingId) {
@@ -33,60 +34,10 @@ class GameRepository {
       ...gameData,
       prerequisite_reading_id: readingId,
       sequence_order: sequenceOrder,
-      is_active: false
+      is_active: true
     }, { transaction });
 
-    // 3. Find learning_path_items that contain this reading to add game to same categories
-    const learningPathItemsWithReading = await sequelize.query(`
-      SELECT DISTINCT learning_path_category_id 
-      FROM learning_path_items 
-      WHERE reading_id = ${readingId}
-    `, {
-      type: sequelize.QueryTypes.SELECT,
-      raw: true,
-      transaction
-    });
-
-    // 4. For each category, add this game with max sequence_order + 1
-    for (const categoryItem of learningPathItemsWithReading) {
-      const categoryId = categoryItem.learning_path_category_id;
-      
-      // Get max sequence_order in this category
-      const maxCategoryOrder = await sequelize.query(`
-        SELECT MAX(sequence_order) as maxOrder 
-        FROM learning_path_items 
-        WHERE learning_path_category_id = ${categoryId}
-      `, {
-        type: sequelize.QueryTypes.SELECT,
-        raw: true,
-        transaction
-      });
-
-      const maxOrderInCategory = maxCategoryOrder[0]?.maxOrder || 0;
-      const newSequenceOrderInCategory = maxOrderInCategory + 1;
-
-      // Create learning_path_item for this game
-      await sequelize.query(`
-        INSERT INTO learning_path_items 
-        (learning_path_category_id, game_id, sequence_order, is_active, created_at, updated_at)
-        VALUES (${categoryId}, ${game.id}, ${newSequenceOrderInCategory}, 1, NOW(), NOW())
-      `, {
-        type: sequelize.QueryTypes.INSERT,
-        transaction
-      });
-    }
-
-    // 5. Return created game with relations
-    const createdGame = await Game.findByPk(game.id, {
-      include: [{
-        model: sequelize.models.KidReading,
-        as: 'prerequisiteReading',
-        attributes: ['id', 'title']
-      }],
-      transaction
-    });
-
-    return createdGame;
+    return game;
   }
 
   async getGameById(id) {
@@ -144,41 +95,55 @@ class GameRepository {
     try {
       const game = await Game.findByPk(id, { transaction });
       if (!game) {
-        await transaction.rollback();
         return null;
       }
 
-      const hasRecords = await sequelize.models.StudentReading.count({
+      const hasRecords = await StudentReading.findOne({
         where: {
-          kid_reading_id: game.prerequisite_reading_id,
           game_id: id,
-          is_completed: 1
-        },
-        transaction
+        }
       });
 
       if (hasRecords > 0) {
-        await game.update({ is_active: false }, { transaction });
-        await transaction.commit();
         return {
           game,
-          deactivated: true,
-          message: "Game was deactivated due to existing student records"
+          message: "Game can only be deactivated due to existing student records"
         };
       }
-
       // Delete related GameWords
       await GameWord.destroy({
         where: { game_id: id },
         transaction
       });
       
-      // Delete related LearningPathItems
-      await sequelize.models.LearningPathItem.destroy({
+
+      const gameItem = await LearningPathItem.findOne({
         where: { game_id: id },
-        transaction
+        include: [
+          {
+            model: LearningPathCategoryItem,
+            as: "learningPathCategory",
+            include: [
+              {
+                model: LearningPath,
+                as: "learningPath",
+                attributes: ["id", "name"],
+              },
+            ],
+          },
+        ],
       });
 
+      if(gameItem !== null 
+        && gameItem.learningPathCategory !== null 
+        && gameItem.learningPathCategory.learningPath !== null) {
+        
+          await LearningPathItemRepository.deleteGameFromPath(
+            gameItem.learningPathCategory.learningPath.id,
+            id,
+            transaction
+          );
+      }
       await game.destroy({ transaction });
       await transaction.commit();
       
