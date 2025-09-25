@@ -505,7 +505,7 @@ async function getAvailableReadingsByCategory(req, res) {
 
     // Extract filters from query params
     const filters = {
-      search: req.query.search,
+      search: req.query.search ?? null,
       difficulty_level: req.query.difficulty_level ?? null,
     };
 

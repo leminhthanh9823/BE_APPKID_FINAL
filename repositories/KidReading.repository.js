@@ -335,9 +335,13 @@ class KidReadingRepository {
       readingWhereClause.title = { [Op.like]: `%${search.trim()}%` };
     }
     
-    if (difficulty_level && difficulty_level >= 1 && difficulty_level <= 5) {
-      readingWhereClause.difficulty = parseInt(difficulty_level);
+    if (difficulty_level){
+      let parseDiff = parseInt(difficulty_level);
+      if (!isNaN(parseDiff) && parseDiff >= 1 && parseDiff <= 5) {
+        readingWhereClause.difficulty_level = parseDiff;
+      }
     }
+
     readingWhereClause.is_active = 1;
 
     return this.withRetry(async () => {
