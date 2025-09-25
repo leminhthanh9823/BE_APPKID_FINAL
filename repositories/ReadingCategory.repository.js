@@ -33,7 +33,7 @@ class ReadingCategoryRepository {
       where: whereCondition,
       offset,
       limit,
-      order: [["updated_at", "DESC"]],
+      order: [["created_at", "DESC"]],
     });
 
     return { rows, count };
@@ -51,7 +51,7 @@ class ReadingCategoryRepository {
       where: whereClause,
       offset,
       limit,
-      order: [["updated_at", "DESC"]],
+      order: [["created_at", "DESC"]],
     });
   }
 
