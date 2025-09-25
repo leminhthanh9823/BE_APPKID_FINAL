@@ -55,7 +55,7 @@ class EBookCategoryRepository {
       where,
       offset,
       limit,
-      order: [['updated_at', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
     return { rows, count };
