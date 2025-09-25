@@ -3,6 +3,7 @@ const gameRepository = require('../repositories/Game.repository');
 const messageManager = require('../helpers/MessageManager.helper');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
 const { GAME_TYPES } = require('../constants/constant');
+const LearningPathItemRepository = require('../repositories/LearningPathItem.repository');
 
 const validateGameData = (data, isUpdate = false) => {
   if (!isUpdate || data.name !== undefined) {
@@ -19,7 +20,7 @@ const validateGameData = (data, isUpdate = false) => {
       return "Game type is required";
     }
     if (isNaN(parseInt(data.type))) {
-      return "Game type must be a valid number";
+      return "Game type must be valid ";
     }
   }
 
@@ -91,23 +92,6 @@ class GameController {
         status = null,
         type = null
       } = req.query;
-
-      // OPTIMIZATION: Skip reading validation if SKIP_READING_CHECK is enabled
-      const SKIP_READING_CHECK = process.env.SKIP_READING_CHECK === 'true';
-      
-      if (!SKIP_READING_CHECK) {
-        // Use simple existence check instead of full object fetch
-        const readingExists = await sequelize.query(`
-          SELECT 1 FROM kid_readings WHERE id = ${parseInt(readingId)} LIMIT 1
-        `, {
-          type: sequelize.QueryTypes.SELECT,
-          raw: true
-        });
-        
-        if (!readingExists || readingExists.length === 0) {
-          return messageManager.notFound('reading', res);
-        }
-      }
 
       const result = await gameRepository.listGames(readingId, {
         page: parseInt(page),
@@ -217,8 +201,6 @@ class GameController {
   }
 
   async create(req, res) {
-    const transaction = await sequelize.transaction();
-
     try {
       const { readingId } = req.params;
       const { name, description, type } = req.body;
@@ -230,13 +212,11 @@ class GameController {
 
       const reading = await sequelize.models.KidReading.findByPk(readingId);
       if (!reading) {
-        await transaction.rollback();
         return messageManager.notFound('reading', res);
       }
 
       const existingGame = await gameRepository.findGameByNameAndReadingId(name, readingId);
       if (existingGame) {
-        await transaction.rollback();
         return messageManager.validationFailed('game', res, 
           "A game with this name already exists for this reading"
         );
@@ -246,30 +226,52 @@ class GameController {
 
       if (req.file) {
         if (!req.file.mimetype.startsWith('image/')) {
-          await transaction.rollback();
           return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
         }
 
-        const imageUrl = await uploadToMinIO(req.file, "games");
-        if (!imageUrl) {
-          await transaction.rollback();
-          return messageManager.createFailed('game', res, 'Failed to upload image');
-        }
+        // const imageUrl = await uploadToMinIO(req.file, "games");
+        // if (!imageUrl) {
+        //   return messageManager.createFailed('game', res, 'Failed to upload image');
+        // }
         
-        gameData.image = imageUrl;
       }
+      gameData.image = "uploaded_image_url"; 
 
-      const createdGame = await gameRepository.createGame(
-        gameData,
-        readingId,
-        transaction
-      );
+      const transaction = await sequelize.transaction();
 
-      await transaction.commit();
+      try{
+        let createdGame = await gameRepository.createGame(
+          gameData,
+          readingId,
+          transaction
+        );
 
-      return messageManager.createSuccess('game', createdGame, res, 201);
+        // Chỉ lấy các trường cần thiết của game
+        if (createdGame && createdGame.dataValues) {
+          createdGame = {
+            id: createdGame.dataValues.id,
+            name: createdGame.dataValues.name,
+            description: createdGame.dataValues.description,
+            type: createdGame.dataValues.type,
+            image: createdGame.dataValues.image,
+            is_active: createdGame.dataValues.is_active,
+            sequence_order: createdGame.dataValues.sequence_order,
+            prerequisite_reading_id: createdGame.dataValues.prerequisite_reading_id,
+          };
+        }
+        const pathItem = await LearningPathItemRepository.checkReadingInLearningPath(readingId);
+
+        createdGame = {
+          ...createdGame,
+          pathItem
+        }
+        transaction.commit();
+        return messageManager.createSuccess('game', createdGame, res, 201);
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
     } catch (error) {
-      await transaction.rollback();
       console.error('Create game error:', error);
       return messageManager.createFailed('game', res, error.message);
     }
