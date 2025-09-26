@@ -412,7 +412,6 @@ class LearningPathRepository {
 
       // 3. Import repository để sử dụng
       const categoryItemRepository = require('./LearningPathCategoryItem.repository.js');
-      
       // 4. Update sequence orders
       const updatedCategories = await categoryItemRepository.updateBulkSequenceOrder(
         categoryOrders, 
@@ -442,7 +441,7 @@ class LearningPathRepository {
       return await db.LearningPath.findAll({
         where: { is_active: 1 },
         attributes: ['id', 'name', 'description', 'difficulty_level', 'image'],
-        order: [['name', 'ASC']]
+        order: [['name', 'ASC'], ['difficulty_level', 'ASC']]
       });
     }
 
