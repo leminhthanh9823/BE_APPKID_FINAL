@@ -2,7 +2,7 @@ const { sequelize } = require('../models');
 const gameRepository = require('../repositories/Game.repository');
 const messageManager = require('../helpers/MessageManager.helper');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
-const { GAME_TYPES } = require('../constants/constant');
+const { GAME_TYPES, GAME_TYPES_CMS } = require('../constants/constant');
 const LearningPathItemRepository = require('../repositories/LearningPathItem.repository');
 const { validateImageFile } = require('../helpers/FileValidation.helper');
 
@@ -82,6 +82,27 @@ class GameController {
       return messageManager.fetchFailed('game', res, error.message);
     }
   }
+  
+  async detailCMS(req, res) {
+    try {
+      const { id } = req.params;
+
+      const game = await gameRepository.getGameById(id);
+      if (!game) {
+        return messageManager.notFound('game', res);
+      }
+
+      // Lấy object dataValues nếu có
+      const raw = game.dataValues ? { ...game.dataValues } : { ...game };
+      const found = GAME_TYPES_CMS.find(t => t.value === Number(raw.type));
+      raw.type = found ? found.label : raw.type;
+
+      return messageManager.fetchSuccess('game', raw, res);
+    } catch (error) {
+      console.error('Get game detail error:', error);
+      return messageManager.fetchFailed('game', res, error.message);
+    }
+  }
 
   async list(req, res) {
     try {
@@ -135,71 +156,74 @@ class GameController {
   }
 
   async update(req, res) {
-    const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction();
 
-    try {
-      const { id } = req.params;
-      const { name, description, type, isActive } = req.body;
-
-      const validationError = validateGameData({ name, description, type }, true);
-      if (validationError) {
-        return messageManager.validationFailed('game', res, validationError);
-      }
-
-      const existingGame = await gameRepository.getGameById(id);
-      if (!existingGame) {
-        return messageManager.notFound('game', res);
-      }
-
-      if (name && name !== existingGame.name) {
-        const duplicateGame = await gameRepository.findGameByNameAndReadingId(
-          name, 
-          existingGame.prerequisite_reading_id
-        );
-        if (duplicateGame && duplicateGame.id !== parseInt(id)) {
-          await transaction.rollback();
-          return messageManager.validationFailed('game', res, 
-            "A game with this name already exists for this reading"
-          );
-        }
-      }
-
-      let updateData = sanitizeGameData({ 
-        name, description, type, is_active: isActive 
-      });
-
-      if (req.file) {
-        if (!req.file.mimetype.startsWith('image/')) {
-          await transaction.rollback();
-          return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
-        }
-
-        const imageUrl = await uploadToMinIO(req.file, "games");
-        if (!imageUrl) {
-          await transaction.rollback();
-          return messageManager.updateFailed('game', res, 'Failed to upload image');
-        }
-        
-        updateData.image = imageUrl;
-      }
-
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined) {
-          delete updateData[key];
-        }
-      });
-
-      const updatedGame = await gameRepository.updateGame(id, updateData, transaction);
-
-      await transaction.commit();
-
-      return messageManager.updateSuccess('game', updatedGame, res);
-    } catch (error) {
-      await transaction.rollback();
-      console.error('Update game error:', error);
-      return messageManager.updateFailed('game', res, error.message);
+  try {
+    const { id } = req.params;
+    const { name, description, type, isActive } = req.body;
+    console.log("[UPDATE GAME] Received data:", { id, name, description, type, isActive });
+    
+    const validationError = validateGameData({ name, description, type }, true);
+    if (validationError) {
+      return messageManager.validationFailed('game', res, validationError);
     }
+
+    const existingGame = await gameRepository.getGameById(id);
+
+    if (!existingGame) {
+      return messageManager.notFound('game', res);
+    }
+
+    if (name && name !== existingGame.name) {
+      const duplicateGame = await gameRepository.findGameByNameAndReadingId(
+        name, 
+        existingGame.prerequisite_reading_id
+      );
+
+      if (duplicateGame && duplicateGame.id !== parseInt(id)) {
+        await transaction.rollback();
+        return messageManager.validationFailed('game', res, 
+          "A game with this name already exists for this reading"
+        );
+      }
+    }
+
+    let updateData = sanitizeGameData({ 
+      name, description, type, is_active: isActive 
+    });
+
+    if (req.file) {
+      if (!req.file.mimetype.startsWith('image/')) {
+        await transaction.rollback();
+        return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
+      }
+
+      const imageUrl = await uploadToMinIO(req.file, "games");
+
+      if (!imageUrl) {
+        await transaction.rollback();
+        return messageManager.updateFailed('game', res, 'Failed to upload image');
+      }
+      
+      updateData.image = imageUrl;
+    }
+
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
+
+    const updatedGame = await gameRepository.updateGame(id, updateData, transaction);
+
+    await transaction.commit();
+    return messageManager.updateSuccess('game', updatedGame, res);
+  } catch (error) {
+    await transaction.rollback();
+    return messageManager.updateFailed('game', res, error.message);
   }
+}
+
 
   async create(req, res) {
     try {

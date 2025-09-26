@@ -30,6 +30,12 @@ router.get('/teacher/games/:id',
   gameController.detail
 );
 
+router.get('/teacher/games/:id/cms',
+  authMiddleware,
+  teacherOnly,
+  gameController.detailCMS
+);
+
 router.put('/teacher/games/:id',
   authMiddleware,
   teacherOnly,

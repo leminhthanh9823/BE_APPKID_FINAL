@@ -66,13 +66,19 @@ class GameRepository {
   }
 
   async updateGame(id, updateData, transaction) {
-    const game = await Game.findByPk(id);
-    if (!game) return null;
+  console.log("[updateGame] id:", id, " updateData:", updateData);
 
-    await game.update(updateData, { transaction });
-    
-    return await this.getGameById(id);
-  }
+  const game = await Game.findByPk(id);
+  console.log("[updateGame] found game:", game ? game.toJSON() : null);
+
+  if (!game) return null;
+
+  await game.update(updateData, { transaction });
+  console.log("[updateGame] after update");
+
+  return await this.getGameById(id);
+}
+
 
   async hasStudentRecords(id) {
     const game = await Game.findByPk(id);
