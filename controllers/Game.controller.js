@@ -229,13 +229,13 @@ class GameController {
           return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
         }
 
-        // const imageUrl = await uploadToMinIO(req.file, "games");
-        // if (!imageUrl) {
-        //   return messageManager.createFailed('game', res, 'Failed to upload image');
-        // }
+        const imageUrl = await uploadToMinIO(req.file, "games");
+        if (!imageUrl) {
+          return messageManager.createFailed('game', res, 'Failed to upload image');
+        }
         
       }
-      gameData.image = "uploaded_image_url"; 
+      gameData.image = imageUrl; 
 
       const transaction = await sequelize.transaction();
 
