@@ -197,12 +197,12 @@ class LearningPathItemRepository {
         let targetItem = null;
         
         if (orderItem.reading_id) {
-          targetItem = readingItemsMap.get(parseInt(orderItem.reading_id));
+          targetItem = readingItemsMap.get(orderItem.reading_id);
           if (!targetItem) {
             throw new Error(`Reading ${orderItem.reading_id} does not belong to this category`);
           }
         } else if (orderItem.game_id) {
-          targetItem = gameItemsMap.get(parseInt(orderItem.game_id));
+          targetItem = gameItemsMap.get(orderItem.game_id);
           if (!targetItem) {
             throw new Error(`Game ${orderItem.game_id} does not belong to this category`);
           }
