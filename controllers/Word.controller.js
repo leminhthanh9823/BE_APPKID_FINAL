@@ -2,6 +2,7 @@ const wordRepository = require('../repositories/Word.repository');
 const messageManager = require('../helpers/MessageManager.helper');
 const { validateKidReadingFiles } = require('../helpers/FileValidation.helper');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
+const axios = require("axios");
 
 const validateWordData = (data, isUpdate = false) => {
   if (!isUpdate || data.word !== undefined) {
@@ -74,61 +75,103 @@ const sanitizeWordData = (data) => {
 
 async function createWord(req, res) {
   try {
-    // Check if client is sending JSON instead of FormData
-    if (req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
-      return messageManager.validationFailed('word', res, 
-        'Invalid request format. Please use FormData (multipart/form-data) instead of JSON. ' +
-        'Image field should be uploaded as a file, not as JSON property.'
+    if (
+      req.headers["content-type"] &&
+      req.headers["content-type"].includes("application/json")
+    ) {
+      return messageManager.validationFailed(
+        "word",
+        res,
+        "Invalid request format. Please use FormData (multipart/form-data) instead of JSON. " +
+          'Image field should be uploaded as a file, not as JSON property.'
       );
     }
-    
-    // Check if image is being sent as part of body instead of file
-    if (req.body.image && (typeof req.body.image === 'string' && req.body.image.includes('[object Object]'))) {
-      return messageManager.validationFailed('word', res, 
-        'Image was not properly uploaded. Please ensure you are using FormData and the image field contains a file, not a string.'
+
+    if (
+      req.body.image &&
+      typeof req.body.image === "string" &&
+      req.body.image.includes("[object Object]")
+    ) {
+      return messageManager.validationFailed(
+        "word",
+        res,
+        "Image was not properly uploaded. Please ensure you are using FormData and the image field contains a file, not a string."
       );
     }
-    
-    // Validate file first
+
     if (!req.file) {
-      return messageManager.validationFailed('word', res, 
+      return messageManager.validationFailed(
+        "word",
+        res,
         'Image file is required. Please upload an image using FormData with field name "image".'
       );
     }
-    
-    // Validate data
+
     const validationError = validateWordData(req.body);
     if (validationError) {
-      return messageManager.validationFailed('word', res, validationError);
+      return messageManager.validationFailed("word", res, validationError);
     }
 
     const sanitizedData = sanitizeWordData(req.body);
 
-    if (!req.file.mimetype.startsWith('image/')) {
-      return messageManager.validationFailed('word', res, 'Invalid file type. Please upload an image file');
+    if (!req.file.mimetype.startsWith("image/")) {
+      return messageManager.validationFailed(
+        "word",
+        res,
+        "Invalid file type. Please upload an image file"
+      );
     }
 
     // Check for duplicate word
     const existingWord = await wordRepository.findByWordText(sanitizedData.word);
     if (existingWord) {
-      return messageManager.validationFailed('word', res, 'Word already exists');
+      return messageManager.validationFailed("word", res, "Word already exists");
+    }
+
+    try {
+      const dictRes = await axios.get(
+        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(
+          sanitizedData.word
+        )}`
+      );
+      if (!Array.isArray(dictRes.data) || dictRes.data.length === 0) {
+        return messageManager.validationFailed(
+          "word",
+          res,
+          "Word not found in dictionary"
+        );
+      }
+    } catch (err) {
+      if (err.response && err.response.status === 404) {
+        return messageManager.validationFailed(
+          "word",
+          res,
+          "Word does not exist in dictionary"
+        );
+      }
+      console.error("Dictionary API error:", err.message);
+      return messageManager.createFailed(
+        "word",
+        res,
+        "Failed to validate word with dictionary API"
+      );
     }
 
     // Upload image to MinIO
     const imageUrl = await uploadToMinIO(req.file, "words");
     if (!imageUrl) {
-      return messageManager.createFailed('word', res, 'Failed to upload image');
+      return messageManager.createFailed("word", res, "Failed to upload image");
     }
 
     const word = await wordRepository.createWord({
       ...sanitizedData,
-      image: imageUrl
+      image: imageUrl,
     });
-    
-    return messageManager.createSuccess('word', word, res);
+
+    return messageManager.createSuccess("word", word, res);
   } catch (error) {
-    console.error('Error in createWord:', error);
-    return messageManager.createFailed('word', res, error.message);
+    console.error("Error in createWord:", error);
+    return messageManager.createFailed("word", res, error.message);
   }
 }
 
