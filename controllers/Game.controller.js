@@ -19,7 +19,7 @@ const validateGameData = (data, isUpdate = false) => {
     if (!data.type && data.type !== 0) {
       return "Game type is required";
     }
-    if (isNaN(parseInt(data.type))) {
+    if (!data.type) {
       return "Game type must be valid ";
     }
   }
@@ -180,6 +180,8 @@ class GameController {
         }
         
         updateData.image = imageUrl;
+      }else{
+        return messageManager.validationFailed('game', res, 'Please upload an image file');
       }
 
       Object.keys(updateData).forEach(key => {
@@ -234,6 +236,8 @@ class GameController {
           return messageManager.createFailed('game', res, 'Failed to upload image');
         }
         
+      }else{
+        return messageManager.validationFailed('game', res, 'Please upload an image file');
       }
       gameData.image = imageUrl; 
 
