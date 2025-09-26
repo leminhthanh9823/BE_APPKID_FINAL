@@ -92,7 +92,7 @@ class LearningPathCategoryItemRepository {
 
     // Check if all categories exist and update sequence orders
     const updatePromises = categoryOrders.map(async (orderItem) => {
-      const categoryItem = existingCategories.find(cat => cat.category_id === orderItem.category_id);
+      const categoryItem = existingCategories.find(cat => parseInt(cat.category_id) === parseInt(orderItem.category_id));
       if (!categoryItem) {
         throw new Error(`Category ${orderItem.category_id} does not belong to this learning path`);
       }
