@@ -20,9 +20,7 @@ function validateNotificationData(data) {
   if (data.type_target === 1 && (!Array.isArray(data.parents) || data.parents.length === 0)) {
     return "Please select at least one parent";
   }
-  if (data.type_target === 2 && (!Array.isArray(data.students) || data.students.length === 0)) {
-    return "Please select at least one student";
-  }
+
   return null;
 }
 
@@ -50,11 +48,6 @@ exports.getAll = async (req, res) => {
           q.notify_target.some((t) => t.parent_id)
         ) {
           target_type = "Parents";
-        } else if (
-          q.notify_target.length > 0 &&
-          q.notify_target.some((t) => t.student_id)
-        ) {
-          target_type = "Students";
         }
       }
       q.target_type = target_type;
@@ -78,7 +71,7 @@ exports.getAll = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { title, content, type_target, is_active, students, parents } = req.body;
+    const { title, content, type_target, is_active, parents } = req.body;
     const validationError = validateNotificationData(req.body);
     if (validationError) {
       return messageManager.validationFailed("notification", res, validationError);
@@ -103,7 +96,6 @@ exports.create = async (req, res) => {
           {
             notify_id: newNotification.id,
             parent_id: null,
-            student_id: null,
             is_to_all_parents: 1,
           },
           { transaction }
@@ -118,15 +110,6 @@ exports.create = async (req, res) => {
           transaction: transaction,
         });
       }
-
-      if (type_target === 2 && Array.isArray(students)) {
-        result = await NotifyTargetRepository.createStudentNotification({
-          notification_id: newNotification.id,
-          student_ids: students,
-          transaction: transaction,
-        });
-      }
-
       await transaction.commit();
   return messageManager.createSuccess("notification", null, res);
     } catch (error) {
@@ -156,7 +139,7 @@ exports.getById = async (req, res) => {
 
 exports.updateById = async (req, res) => {
   try {
-    const { id, title, content, is_active, parents, students } = req.body;
+    const { id, title, content, is_active, parents } = req.body;
 
     if (!id) {
       return messageManager.notFound("notification", res);
@@ -175,10 +158,8 @@ exports.updateById = async (req, res) => {
       type_target = 0;
     } else if (targetNotifications[0] && targetNotifications[0].parent_id) {
       type_target = 1;
-    } else if (targetNotifications[0] && targetNotifications[0].student_id) {
-      type_target = 2;
-    }
-    const validationError = validateNotificationData({ title, content, is_active, type_target, parents, students });
+    } 
+    const validationError = validateNotificationData({ title, content, is_active, type_target, parents });
 
     if (validationError) {
       return messageManager.validationFailed("notification", res, validationError);
@@ -231,38 +212,6 @@ exports.updateById = async (req, res) => {
         }
       }
 
-      if (type_target === 2 && targetNotifications.length > 0) {
-        const existingStudentIds = targetNotifications
-          .map((t) => t.student_id)
-          .filter((id) => id !== null);
-        const newStudentIds = students.filter(
-          (id) => !existingStudentIds.includes(id)
-        );
-        const removedStudentIds = existingStudentIds.filter(
-          (id) => !students.includes(id)
-        );
-        if (removedStudentIds.length > 0) {
-          await db.NotifyTarget.destroy({
-            where: {
-              notify_id: id,
-              student_id: removedStudentIds,
-            },
-            transaction,
-          });
-        }
-        if (newStudentIds.length > 0) {
-          await db.NotifyTarget.bulkCreate(
-            newStudentIds.map((studentId) => ({
-              notify_id: id,
-              parent_id: null,
-              student_id: studentId,
-              is_to_all_parents: 0,
-            })),
-            { transaction }
-          );
-        }
-      }
-
       await transaction.commit();
   return messageManager.updateSuccess("notification", null, res);
     } catch (error) {
@@ -277,7 +226,6 @@ exports.updateById = async (req, res) => {
 exports.getByParent = async (req, res) => {
   try {
     let {
-      studentId,
       parentId,
       searchTerm = "",
       pageNumb = 1,
@@ -285,18 +233,19 @@ exports.getByParent = async (req, res) => {
     } = req.body || {};
     let offset = (pageNumb - 1) * pageSize;
     let { rows, count } = await NotifyRepo.getNotificationsForParent({
-      studentId,
       parentId,
       searchTerm,
       offset,
       pageSize,
     });
+
     return messageManager.fetchSuccess("notification", {
       notification_list: rows.map((q) => ({
         notify_id: q.id,
         title: q.title,
         content: q.content,
         send_date: q.send_date,
+        parent_id: q.notify_target[0]?.parent_id
       })),
       total_record: count,
       total_page: Math.ceil(count / pageSize),
@@ -309,7 +258,6 @@ exports.getByParent = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { is_active } = req.body;
 
     if (!id || isNaN(id)) {
       return messageManager.notFound("notification", res);

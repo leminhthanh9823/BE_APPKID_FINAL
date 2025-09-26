@@ -21,7 +21,6 @@ class NotifyRepository {
             "id",
             "notify_id",
             "parent_id",
-            "student_id",
             "is_to_all_parents",
             "is_active",
           ],
@@ -51,37 +50,11 @@ class NotifyRepository {
   }
 
   async getNotificationsForParent({
-    studentId,
     parentId,
     searchTerm = "",
     offset = 0,
     pageSize = 10,
   }) {
-    if (!studentId) {
-      // Nếu không tìm thấy student, chỉ trả về thông báo dành cho tất cả phụ huynh
-      const whereNotify = { is_active: 1 };
-      if (searchTerm) {
-        whereNotify.title = { [Op.like]: `%${searchTerm}%` };
-      }
-      const { rows, count } = await Notify.findAndCountAll({
-        where: whereNotify,
-        include: [
-          {
-            model: NotifyTarget,
-            as: "notify_target",
-            where: {
-              is_to_all_parents: 1,
-            },
-            required: true,
-          },
-        ],
-        order: [["send_date", "DESC"]],
-        offset,
-        limit: pageSize,
-      });
-      return { rows, count };
-    }
-
     let whereConditions = [];
 
     // Điều kiện 1: Thông báo gửi đến tất cả phụ huynh
@@ -91,12 +64,6 @@ class NotifyRepository {
 
     whereConditions.push({
       parent_id: parentId,
-      is_to_all_parents: 0,
-    });
-
-    // Điều kiện 3: Thông báo gửi trực tiếp đến student
-    whereConditions.push({
-      student_id: studentId,
       is_to_all_parents: 0,
     });
 
@@ -114,6 +81,7 @@ class NotifyRepository {
           where: {
             [Op.or]: whereConditions,
           },
+          attributes: [ 'is_to_all_parents', 'parent_id'],
           required: true,
         },
       ],
