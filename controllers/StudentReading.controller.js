@@ -93,6 +93,33 @@ async function createStudentReading(req, res) {
   try {
     const { kid_student_id, kid_reading_id, score, is_completed, duration, learning_path_id, game_id } =
       req.body;
+    
+    let existingCount = 0;
+    let whereCondition = { kid_student_id, is_active: 1 };
+    
+    if (game_id) {
+      whereCondition.game_id = game_id;
+    } else if (kid_reading_id) {
+      whereCondition.kid_reading_id = kid_reading_id;
+    }
+    
+    existingCount = await db.StudentReading.count({
+      where: whereCondition
+    });
+    
+    if (existingCount >= 4) {
+      const latestRecord = await db.StudentReading.findOne({
+        where: whereCondition,
+        order: [['created_at', 'DESC']]
+      });
+      
+      return res.json({
+        success: true,
+        status: 200,
+        data: latestRecord,
+      });
+    }
+    
     const newRecord = await repository.create({
       kid_student_id,
       kid_reading_id,
