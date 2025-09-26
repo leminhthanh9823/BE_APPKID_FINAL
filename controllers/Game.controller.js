@@ -4,6 +4,7 @@ const messageManager = require('../helpers/MessageManager.helper');
 const { uploadToMinIO } = require('../helpers/UploadToMinIO.helper');
 const { GAME_TYPES } = require('../constants/constant');
 const LearningPathItemRepository = require('../repositories/LearningPathItem.repository');
+const { validateImageFile } = require('../helpers/FileValidation.helper');
 
 const validateGameData = (data, isUpdate = false) => {
   if (!isUpdate || data.name !== undefined) {
@@ -19,7 +20,7 @@ const validateGameData = (data, isUpdate = false) => {
     if (!data.type && data.type !== 0) {
       return "Game type is required";
     }
-    if (isNaN(parseInt(data.type))) {
+    if (!data.type) {
       return "Game type must be valid ";
     }
   }
@@ -224,16 +225,14 @@ class GameController {
 
       let gameData = sanitizeGameData({ name, description, type });
 
-      if (req.file) {
-        if (!req.file.mimetype.startsWith('image/')) {
-          return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
-        }
+      const imageValidationError = validateImageFile(req.file);
+      if (imageValidationError) {
+        return messageManager.validationFailed('games', res, imageValidationError);
+      }
 
-        const imageUrl = await uploadToMinIO(req.file, "games");
-        if (!imageUrl) {
-          return messageManager.createFailed('game', res, 'Failed to upload image');
-        }
-        
+      const imageUrl = await uploadToMinIO(req.file, "games");
+      if (!imageUrl){
+        return messageManager.uploadFileFailed("games", res);
       }
       gameData.image = imageUrl; 
 

@@ -1,4 +1,4 @@
-const { StudentReading, KidReading, LearningPath, LearningPathCategoryItem, ReadingCategory, LearningPathItem } = require('../models');
+const { StudentReading, KidReading, LearningPath, LearningPathCategoryItem, ReadingCategory, LearningPathItem, Game } = require('../models');
 const { fn, col, Op } = require('sequelize');
 class StudentReadingRepository {
   async getScoreByStudentAndReading(kid_student_id, kid_reading_id) {
@@ -65,7 +65,7 @@ class StudentReadingRepository {
         },
         attributes: [
           "kid_student_id",
-          [fn("COUNT", fn("DISTINCT", col("kid_reading_id"))), "completed_count"],
+          [fn("COUNT", col("id")), "completed_count"],
         ],
         group: ["kid_student_id"],
         raw: true,
@@ -83,8 +83,16 @@ class StudentReadingRepository {
   async getHistoryReading(student_id, title, is_completed, offset, pageSize) {
     const whereConditions = {
       kid_student_id: student_id,
-      ...(title && { '$reading.title$': { [Op.like]: `%${title}%` } }),
     };
+
+    // If title provided, search either reading.title or game.name
+    if (title) {
+      whereConditions[Op.or] = [
+        { '$reading.title$': { [Op.like]: `%${title}%` } },
+        { '$game.name$': { [Op.like]: `%${title}%` } }
+      ];
+    }
+
     if (is_completed !== null && is_completed !== undefined) {
       whereConditions.is_completed = is_completed;
     }
@@ -93,11 +101,20 @@ class StudentReadingRepository {
     try {
       records = await StudentReading.findAndCountAll({
         where: whereConditions,
-        include: [{
-          model: KidReading,
-          as: 'kid_readings',
-          attributes: ['id', 'title', 'image', 'file'],
-        }],
+        include: [
+          {
+            model: KidReading,
+            as: 'reading',
+            attributes: ['id', 'title', 'image', 'file'],
+            required: false
+          },
+          {
+            model: Game,
+            as: 'game',
+            attributes: ['id', 'name', 'image', 'description'],
+            required: false
+          }
+        ],
         offset: offset,
         limit: pageSize,
         order: [['date_reading', 'DESC']],

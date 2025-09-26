@@ -135,17 +135,20 @@ async function getHistoryReading(req, res) {
         offset,
         pageSize
       );
+
     let data = rows.map((row) => {
       return {
-        image: row.kid_readings.image ?? null,
-        title: row.kid_readings.title ?? null,
+        image: row.reading?.image ?? row.game?.image ?? null,
+        title: row.reading?.title ?? row.game?.name ?? null,
         is_completed: row.is_completed,
         duration: row.duration,
         star: row.star,
         score: row.score,
         date: row.date_reading,
+        type: row.reading ? "Reading" : "Game",
       };
     });
+
     res.json({
       success: true,
       status: 200,
