@@ -348,7 +348,7 @@ class StudentReadingRepository {
         return {
           category_id: categoryItem.category_id,
           category_name: categoryItem.category?.title || 'Unknown',
-          total_stars: totalStars,
+          total_stars: totalStars/items.length || 0,
           total_items: items.length,
           items_with_stars: items.filter(item => 
             starsMap.has(item.game_id || item.reading_id)

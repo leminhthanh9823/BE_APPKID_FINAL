@@ -58,11 +58,23 @@ class GeminiHelper {
         }
       });
 
-      if (response.data.candidates && response.data.candidates.length > 0) {
-        return response.data.candidates[0].content.parts[0].text.trim();
-      } else {
-        throw new Error('No response from Gemini API');
+      console.log('Gemini API response status:', response.status);
+      console.log('Gemini API response data structure:', {
+        hasCandidates: !!response.data?.candidates,
+        candidatesLength: response.data?.candidates?.length || 0,
+        firstCandidate: response.data?.candidates?.[0] ? 'exists' : 'missing'
+      });
+
+      if (response.data && response.data.candidates && response.data.candidates.length > 0) {
+        const candidate = response.data.candidates[0];
+        if (candidate && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+          return candidate.content.parts[0].text.trim();
+        }
       }
+      
+      console.error('Invalid response structure from Gemini API:', JSON.stringify(response.data, null, 2));
+      throw new Error('Invalid response from Gemini API');
+      
     } catch (error) {
       console.error('Error calling Gemini API:', error.response?.data || error.message);
       
@@ -97,7 +109,6 @@ Hãy phân tích và đưa ra lời khuyên học tập cho học sinh sau đây
 
 **THÔNG TIN HỌC SINH:**
 - Tên: ${studentInfo.name}
-- Lớp: ${studentInfo.grade_id}
 - Giới tính: ${studentInfo.gender || 'Không xác định'}
 - Tuổi: ${this.calculateAge(studentInfo.dob)}
 

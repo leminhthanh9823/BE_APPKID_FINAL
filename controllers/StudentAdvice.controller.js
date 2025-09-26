@@ -137,8 +137,8 @@ class StudentAdviceController {
         return messageManager.fetchFailed("advice", res, "Không tìm thấy học sinh");
       }
 
-      // Tạo lời khuyên ngắn
-      const shortAdvice = await geminiHelper.generateShortAdvice(studentData, period);
+      // Tạo lời khuyên ngắn đơn giản
+      const shortAdvice = this.generateSimpleShortAdvice(studentData.stats);
 
       const responseData = {
         kid_student_id: parseInt(kid_student_id),
@@ -183,17 +183,17 @@ class StudentAdviceController {
       return messageManager.fetchFailed("advice", res, "Không tìm thấy học sinh");
     }
 
-    // Lấy dữ liệu so sánh với lớp (nếu có)
+    // Lấy dữ liệu so sánh với các bạn học cùng category và lộ trình (nếu có)
     let classComparison = null;
     try {
       classComparison = await studentAdviceRepository.getClassComparison(
         kid_student_id,
-        studentData.studentInfo.grade_id,
+        null, // Không cần grade_id nữa
         start_date,
         end_date
       );
     } catch (error) {
-      console.log("Could not get class comparison:", error.message);
+      console.log("Could not get peer comparison:", error.message);
     }
 
     // Thêm thông tin period text để ChatGPT hiểu rõ hơn
@@ -210,14 +210,13 @@ class StudentAdviceController {
       periodText: periodTexts[period] || 'thời gian vừa qua'
     };
 
-    // Tạo lời khuyên bằng Gemini
-    const advice = await geminiHelper.generateLearningAdvice(enrichedStudentData, period);
+    // Tạo lời khuyên đơn giản dựa trên so sánh
+    const advice = this.generateSimpleAdvice(studentData, classComparison, period);
 
     // Chuẩn bị response data
     const responseData = {
       kid_student_id: parseInt(kid_student_id),
       student_name: studentData.studentInfo.name,
-      grade_id: studentData.studentInfo.grade_id,
       period,
       start_date,
       end_date,
@@ -296,6 +295,90 @@ class StudentAdviceController {
       start_date: startOfYear.toISOString().split('T')[0],
       end_date: endOfYear.toISOString().split('T')[0]
     };
+  }
+
+  /**
+   * Tạo lời khuyên đơn giản dựa trên so sánh với peers
+   */
+  generateSimpleAdvice(studentData, classComparison, period) {
+    const { studentInfo, stats } = studentData;
+    const periodText = {
+      week: 'tuần vừa qua',
+      month: 'tháng vừa qua', 
+      year: 'năm vừa qua',
+      custom: 'khoảng thời gian này'
+    }[period] || 'thời gian vừa qua';
+
+    let advice = `Chào em ${studentInfo.name}!\n\n`;
+
+    // Đánh giá tổng quan
+    if (stats.totalReadings === 0) {
+      advice += `Em chưa hoàn thành bài đọc nào trong ${periodText}. Hãy bắt đầu đọc để phát triển kỹ năng nhé!`;
+      return advice;
+    }
+
+    // So sánh với các bạn cùng chủ đề
+    if (classComparison && classComparison.totalClassmates > 0) {
+      const { classAverage, classRank, totalClassmates, studentAvgScore, comparisonCategory } = classComparison;
+      const categoryName = comparisonCategory?.name || 'chủ đề';
+      
+      if (studentAvgScore >= classAverage) {
+        advice += `Tuyệt vời! Số sao trung bình của em là ${studentAvgScore}/5, cao hơn mức trung bình ${classAverage}/5 của các bạn học cùng chủ đề "${categoryName}". `;
+        advice += `Em đang xếp thứ ${classRank}/${totalClassmates} trong nhóm chủ đề này. Hãy tiếp tục duy trì phong độ này!`;
+      } else {
+        const gap = (classAverage - studentAvgScore).toFixed(1);
+        advice += `Số sao trung bình của em là ${studentAvgScore}/5, thấp hơn ${gap} điểm so với mức trung bình ${classAverage}/5 của các bạn học cùng chủ đề "${categoryName}". `;
+        advice += `Em đang xếp thứ ${classRank}/${totalClassmates} trong nhóm chủ đề này. Con cần chăm học hơn để cải thiện kết quả nhé!`;
+      }
+    } else {
+      // Đánh giá dựa trên số sao cá nhân
+      if (stats.averageScore >= 4) {
+        advice += `Kết quả học tập ${periodText} của em rất xuất sắc với số sao trung bình ${stats.averageScore}/5!`;
+      } else if (stats.averageScore >= 3.2) {
+        advice += `Em đã có kết quả học tập khá tốt ${periodText} với số sao trung bình ${stats.averageScore}/5.`;
+      } else {
+        advice += `Em cần cố gắng hơn nữa để cải thiện kết quả học tập. Số sao trung bình ${periodText} là ${stats.averageScore}/5.`;
+      }
+    }
+
+    // Đánh giá về tỷ lệ hoàn thành
+    advice += `\n\nEm đã hoàn thành ${stats.completedReadings}/${stats.totalReadings} bài đọc (${stats.completionRate}%). `;
+    
+    if (stats.completionRate >= 80) {
+      advice += `Thật tuyệt vời! Em rất chăm chỉ trong việc hoàn thành bài đọc.`;
+    } else if (stats.completionRate >= 60) {
+      advice += `Kết quả khá tốt, nhưng em có thể cố gắng hoàn thành nhiều bài hơn nữa.`;
+    } else {
+      advice += `Em nên cố gắng hoàn thành nhiều bài đọc hơn để phát triển kỹ năng đọc hiểu.`;
+    }
+
+    // Khuyến khích dựa trên xu hướng cải thiện
+    if (stats.improvementTrend > 0) {
+      advice += `\n\nĐiểm số của em đã cải thiện tích cực. Hãy tiếp tục cố gắng!`;
+    } else if (stats.improvementTrend < -1) {
+      advice += `\n\nEm cần chú ý hơn vì điểm số có xu hướng giảm. Hãy đọc chậm và kỹ hơn nhé!`;
+    }
+
+    return advice;
+  }
+
+  /**
+   * Tạo lời khuyên ngắn đơn giản
+   */
+  generateSimpleShortAdvice(stats) {
+    if (stats.totalReadings === 0) {
+      return "Hãy bắt đầu đọc để phát triển kỹ năng nhé!";
+    }
+
+    if (stats.improvementTrend > 0) {
+      return `Tuyệt vời! Điểm số của em đã cải thiện ${stats.improvementTrend.toFixed(1)} điểm. Hãy tiếp tục cố gắng!`;
+    } else if (stats.averageScore >= 4) {
+      return `Em đang học rất tốt với số sao trung bình ${stats.averageScore}/5. Hãy duy trì phong độ này!`;
+    } else if (stats.completionRate >= 80) {
+      return `Em rất chăm chỉ khi hoàn thành ${stats.completionRate}% bài đọc. Hãy tập trung nâng cao chất lượng!`;
+    } else {
+      return `Em cần cố gắng hơn nữa. Hãy đọc chậm và kỹ để hiểu sâu nội dung nhé!`;
+    }
   }
 
   /**
