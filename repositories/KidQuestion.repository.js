@@ -64,7 +64,7 @@ async function updateQuestionInfo(id, questionData, transaction = null) {
 async function getQuestionsByReadingId(readingId) {
   try {
     const questions = await Question.findAll({
-      where: { kid_reading_id: readingId },
+      where: { kid_reading_id: readingId, is_active: true },
       include: [
         {
           model: Option,
