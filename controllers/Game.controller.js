@@ -180,8 +180,6 @@ class GameController {
         }
         
         updateData.image = imageUrl;
-      }else{
-        return messageManager.validationFailed('game', res, 'Please upload an image file');
       }
 
       Object.keys(updateData).forEach(key => {
