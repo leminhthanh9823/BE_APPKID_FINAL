@@ -442,6 +442,7 @@ async function getKidReadingByCategory(req, res) {
       searchTerm,
       sorts,
       is_active,
+      null,
       category_id
     );
 
