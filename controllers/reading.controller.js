@@ -101,7 +101,7 @@ const getQuestionList = async (req, res) => {
     const kidReadingId = req.params.kid_reading_id;
 
     const questions = await db.Question.findAll({
-      where: { kid_reading_id: kidReadingId },
+      where: { kid_reading_id: kidReadingId, is_active: 1 },
       include: [
         {
           model: db.Answer,
