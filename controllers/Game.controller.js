@@ -19,7 +19,7 @@ const validateGameData = (data, isUpdate = false) => {
     if (!data.type && data.type !== 0) {
       return "Game type is required";
     }
-    if (isNaN(parseInt(data.type))) {
+    if (!data.type) {
       return "Game type must be valid ";
     }
   }
@@ -229,13 +229,15 @@ class GameController {
           return messageManager.validationFailed('game', res, 'Invalid file type. Please upload an image file');
         }
 
-        // const imageUrl = await uploadToMinIO(req.file, "games");
-        // if (!imageUrl) {
-        //   return messageManager.createFailed('game', res, 'Failed to upload image');
-        // }
+        const imageUrl = await uploadToMinIO(req.file, "games");
+        if (!imageUrl) {
+          return messageManager.createFailed('game', res, 'Failed to upload image');
+        }
         
+      }else{
+        return messageManager.validationFailed('game', res, 'Please upload an image file');
       }
-      gameData.image = "uploaded_image_url"; 
+      gameData.image = imageUrl; 
 
       const transaction = await sequelize.transaction();
 
