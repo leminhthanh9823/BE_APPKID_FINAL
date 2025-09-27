@@ -17,9 +17,6 @@ const validateKidStudentData = (data) => {
   if (!data.dob) {
     return "Date of birth is required";
   }
-  if (!data.grade_id || isNaN(data.grade_id) || data.grade_id < 1 || data.grade_id > 5) {
-    return "Please select a valid grade";
-  }
   return null;
 };
 
@@ -146,13 +143,13 @@ async function parentUpdateChild(req, res) {
 async function parentCreateChild(req, res) {
   try {
     const { name, image, gender, dob, grade_id } = req.body;
-    const validationError = validateKidStudentData({ name, gender, dob, grade_id });
+    const validationError = validateKidStudentData({ name, gender, dob });
     if (validationError) {
       return messageManager.validationFailed("student", validationError);
     }
     const authUser = req.user;
     const newChild = await KidStudentRepository.create({
-      grade_id: grade_id,
+      grade_id: null,
       kid_parent_id: authUser.id,
       is_passed_survey: true,
       name: name,
